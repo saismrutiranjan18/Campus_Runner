@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "178312847518",
+    "project_id": "campus-runner-sai-9bd05",
+    "storage_bucket": "campus-runner-sai-9bd05.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:178312847518:android:c7738ee815a940ab17db8f",
+        "android_client_info": {
+          "package_name": "com.example.campus_runner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "178312847518-krkb3pti584tq0mk8klgmkc3h79k9h1n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.campus_runner",
+            "certificate_hash": "e8d96e3279a9eb3634a4aaf36a322862ffeb1041"
+          }
+        },
+        {
+          "client_id": "178312847518-3ttaoe56c9q88rh079tneplto6s1s881.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArUoR9DR195an7rnm4WRuFbceXglPiCRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "178312847518-3ttaoe56c9q88rh079tneplto6s1s881.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "178312847518-07kq1o5jhb3uocsodlidcm0re56d98nt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.campusRunner"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
