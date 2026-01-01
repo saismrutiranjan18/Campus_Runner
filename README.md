@@ -1,4 +1,4 @@
-# 🏃‍♂️ Campus Runner
+#  Campus Runner
 ### A Smart Campus Delivery & Errand Service Platform 🎓
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?logo=flutter)](https://flutter.dev)
@@ -8,7 +8,7 @@
 
 ---
 
-## 📌 Overview
+##  Overview
 
 **Campus Runner** is a cross-platform mobile application built with Flutter that connects students who need quick deliveries or errands done with other students willing to earn money by fulfilling these requests. Whether it's grabbing lunch, picking up notes, or delivering packages within campus, Campus Runner makes student life easier and creates earning opportunities.
 
@@ -16,45 +16,37 @@ This platform promotes a collaborative campus economy where students help each o
 
 ---
 
-## 🎯 Objectives
+##  Objectives
 
-- 🤝 Enable peer-to-peer campus delivery and errands
-- 💰 Create earning opportunities for students
-- ⚡ Provide quick and reliable on-campus services
-- 🔒 Ensure safe and verified transactions
-- 🌐 Build a connected campus community
+-  Enable peer-to-peer campus delivery and errands
+-  Create earning opportunities for students
+-  Provide quick and reliable on-campus services
+-  Ensure safe and verified transactions
+-  Build a connected campus community
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 ### For Requesters (Customers)
-- 📦 **Quick Service Requests** - Post delivery or errand requests instantly
-- 📍 **Live Tracking** - Track your runner's location in real-time
-- 💳 **Multiple Payment Options** - UPI, Wallet, Cash on Delivery
-- ⭐ **Rating System** - Rate and review runners
-- 📱 **Push Notifications** - Real-time updates on request status
-- 💬 **In-App Chat** - Communicate with your runner
-
-### For Runners (Service Providers)
-- 🎯 **Browse Requests** - View available delivery/errand requests nearby
-- 💵 **Earn Money** - Get paid for completed tasks
-- 📊 **Earnings Dashboard** - Track your income and completed deliveries
-- 🏆 **Build Reputation** - Earn ratings and badges
-- ⏰ **Flexible Schedule** - Accept requests when you're available
-- 🗺️ **Route Optimization** - Get the best routes for deliveries
+-  **Quick Service Requests** - Post delivery or errand requests instantly
+- **Live Tracking** - Track your runner's location in real-time
+-  **Multiple Payment Options** - UPI, Wallet, Cash on Delivery
+-  **Rating System** - Rate and review runners
+-  **Push Notifications** - Real-time updates on request status
+-  **In-App Chat** - Communicate with your runner
 
 ### General Features
-- 🔐 **Secure Authentication** - Email/Phone verification
-- 👤 **User Profiles** - Complete profile with verification
-- 🔔 **Smart Notifications** - Stay updated on all activities
-- 📈 **Analytics** - View usage statistics and trends
-- 🌓 **Dark Mode Support** - Easy on the eyes
-- 🌍 **Multi-language Support** - Accessible to all students
+-  **Secure Authentication** - Email/Phone verification
+-  **User Profiles** - Complete profile with verification
+-  **Smart Notifications** - Stay updated on all activities
+-  **Analytics** - View usage statistics and trends
+- **Dark Mode Support** - Easy on the eyes
+-  **Multi-language Support** - Accessible to all students
 
 ---
 
-## 🗂️ Project Structure
+##  Project Structure
 
 ```
 campus_runner/
@@ -112,7 +104,7 @@ campus_runner/
 
 ---
 
-## 🛠️ Technologies Used
+##  Technologies Used
 
 ### Frontend
 - **Flutter** - Cross-platform UI framework
@@ -137,7 +129,7 @@ campus_runner/
 
 ---
 
-## ⚙️ Installation & Setup
+##  Installation & Setup
 
 ### Prerequisites
 - Flutter SDK (3.0 or higher)
@@ -197,31 +189,7 @@ flutter build ios --release  # iOS
 
 ---
 
-## 🔁 Application Workflow
-
-### Requester Flow
-1. 📱 User signs up/logs in to the app
-2. 📝 Creates a new delivery/errand request with details
-3. 💰 Sets the delivery fee and pickup/drop locations
-4. ⏳ Waits for a runner to accept the request
-5. 📍 Tracks runner's location in real-time
-6. ✅ Confirms delivery completion
-7. ⭐ Rates the runner and provides feedback
-8. 💳 Payment is processed
-
-### Runner Flow
-1. 📱 Signs up/logs in as a runner
-2. ✅ Completes profile verification
-3. 🎯 Browses available requests nearby
-4. 👍 Accepts a request that fits their route
-5. 📞 Contacts the requester if needed
-6. 🏃 Picks up and delivers the item
-7. ✅ Marks delivery as complete
-8. 💵 Receives payment in wallet
-
----
-
-## 📱 Screenshots
+##  Screenshots
 
 <!-- Add your app screenshots here -->
 | Home Screen | Request Details | Live Tracking |
@@ -234,7 +202,7 @@ flutter build ios --release  # iOS
 
 ---
 
-## 🔧 Configuration
+##  Configuration
 
 ### Environment Variables
 Create a `.env` file in the root directory:
@@ -257,7 +225,7 @@ class AppConstants {
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Run all tests
@@ -272,32 +240,32 @@ flutter test integration_test/
 
 ---
 
-## 📈 Future Enhancements
+##  Future Enhancements
 
-- 🤖 **AI-Based Route Optimization** - Smart routing for multiple deliveries
-- 🎁 **Subscription Plans** - Premium features for frequent users
-- 🏪 **Campus Store Integration** - Direct ordering from campus shops
-- 📊 **Advanced Analytics** - Detailed insights for runners
-- 🎮 **Gamification** - Badges, leaderboards, and achievements
-- 🌐 **Multi-Campus Support** - Expand to multiple universities
-- 🔊 **Voice Commands** - Hands-free operation
-- 🚴 **Multiple Transport Modes** - Walking, cycling, vehicle options
-- 💳 **Cryptocurrency Payments** - Crypto wallet integration
-- 🌍 **Carbon Footprint Tracking** - Track environmental impact
+-  **AI-Based Route Optimization** - Smart routing for multiple deliveries
+-  **Subscription Plans** - Premium features for frequent users
+-  **Campus Store Integration** - Direct ordering from campus shops
+-  **Advanced Analytics** - Detailed insights for runners
+-  **Gamification** - Badges, leaderboards, and achievements
+-  **Multi-Campus Support** - Expand to multiple universities
+-  **Voice Commands** - Hands-free operation
+-  **Multiple Transport Modes** - Walking, cycling, vehicle options
+-  **Cryptocurrency Payments** - Crypto wallet integration
+-  **Carbon Footprint Tracking** - Track environmental impact
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions from the community! Here's how you can help:
 
 ### How to Contribute
-1. 🍴 Fork the repository
-2. 🌿 Create a new branch (`git checkout -b feature/AmazingFeature`)
-3. 💻 Make your changes
-4. ✅ Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-5. 📤 Push to the branch (`git push origin feature/AmazingFeature`)
-6. 🔃 Open a Pull Request
+1. Fork the repository
+2.  Create a new branch (`git checkout -b feature/AmazingFeature`)
+3. Make your changes
+4.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+5.  Push to the branch (`git push origin feature/AmazingFeature`)
+6.  Open a Pull Request
 
 ### Contribution Guidelines
 - Write clean, documented code
@@ -310,13 +278,13 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-## 📋 Code of Conduct
+##  Code of Conduct
 
 This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ---
 
-## 🐛 Known Issues
+##  Known Issues
 
 - [ ] iOS push notifications occasionally delayed
 - [ ] Map rendering slow on older devices
@@ -326,7 +294,7 @@ See the [Issues](https://github.com/saismrutiranjan18/Campus_Runner/issues) page
 
 ---
 
-## 📜 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -342,7 +310,7 @@ in the Software without restriction...
 
 ---
 
-## 👥 Team
+##  Team
 
 **Project Lead & Developer**
 - Sai Smruti Ranjan - [@saismrutiranjan18](https://github.com/saismrutiranjan18)
@@ -352,18 +320,18 @@ in the Software without restriction...
 
 ---
 
-## 📧 Contact & Support
+##  Contact & Support
 
-- 📧 **Email**: saismrutiranjan18@example.com
-- 💬 **Discord**: [Join our server](https://discord.gg/yourserver)
-- 🐦 **Twitter**: [@campusrunner](https://twitter.com/campusrunner)
-- 🌐 **Website**: [campusrunner.app](https://campusrunner.app)
+-  **Email**: saismrutiranjan18@example.com
+-  **Discord**: [Join our server](https://discord.gg/yourserver)
+- **Twitter**: [@campusrunner](https://twitter.com/campusrunner)
+-  **Website**: [campusrunner.app](https://campusrunner.app)
 
 For bug reports and feature requests, please use [GitHub Issues](https://github.com/saismrutiranjan18/Campus_Runner/issues).
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Flutter team for the amazing framework
 - Google Maps Platform for location services
@@ -373,7 +341,7 @@ For bug reports and feature requests, please use [GitHub Issues](https://github.
 
 ---
 
-## 📊 Project Stats
+##  Project Stats
 
 ![GitHub stars](https://img.shields.io/github/stars/saismrutiranjan18/Campus_Runner?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/saismrutiranjan18/Campus_Runner?style=social)
@@ -383,18 +351,18 @@ For bug reports and feature requests, please use [GitHub Issues](https://github.
 
 ---
 
-## 🌟 Show Your Support
+##  Show Your Support
 
 If you like this project, please consider:
-- ⭐ Starring the repository
-- 🔀 Forking and contributing
-- 📢 Sharing with friends
-- 🐛 Reporting bugs
-- 💡 Suggesting new features
+-  Starring the repository
+-  Forking and contributing
+-  Sharing with friends
+- Reporting bugs
+-  Suggesting new features
 
 ---
 
-## 🚀 Deployment
+##  Deployment
 
 ### Android
 ```bash
@@ -414,7 +382,7 @@ flutter build web --release
 
 ---
 
-## 📱 Download
+##  Download
 
 [<img src="https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png" alt="Get it on Google Play" height="80">](https://play.google.com/store)
 [<img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" alt="Download on App Store" height="80">](https://apps.apple.com)
@@ -423,7 +391,7 @@ flutter build web --release
 
 <div align="center">
 
-**🏃‍♂️ Built with ❤️ by students, for students**
+** Built with ❤️ by students, for students**
 
 *Making campus life easier, one delivery at a time!*
 
