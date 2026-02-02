@@ -1,0 +1,47 @@
+name: "⚙️ Enhancement"
+description: Suggest improvements to existing features
+title: "[ENHANCEMENT]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: What currently happens?
+      placeholder: "Transaction history loads slowly on mobile"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed improvement
+      description: How should it work better?
+      placeholder: "Add infinite scroll + caching"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - High (affects many users)
+        - Medium (noticeable improvement)
+        - Low (nice to have)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component affected
+      options:
+        - iOS
+        - Android
+        - Web
+        - API
+        - UX/UI
+        - Other
+    validations:
+      required: true
