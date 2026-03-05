@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 echo "==> Cloning Flutter..."
 git clone https://github.com/flutter/flutter.git -b stable --depth 1
 
-echo "==> Setting up Flutter..."
+echo "==> Setting PATH..."
 export PATH="$PWD/flutter/bin:$PATH"
 chmod +x ./flutter/bin/flutter ./flutter/bin/dart
 
@@ -26,4 +26,4 @@ flutter build web --release \
   --dart-define=FIREBASE_MEASUREMENT_ID="${FIREBASE_MEASUREMENT_ID:-}" \
   --dart-define=GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
 
-echo "==> Build complete."
+echo "==> Done."
