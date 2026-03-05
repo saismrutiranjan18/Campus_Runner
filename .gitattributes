@@ -1,0 +1,5 @@
+# Default: normalize line endings on checkout to OS default
+* text=auto
+
+# Force shell scripts to always use LF (required for bash on Linux/Vercel)
+*.sh text eol=lf
