@@ -5,7 +5,7 @@ FLUTTER_VERSION="3.27.4"
 FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
 
 echo "==> Downloading Flutter ${FLUTTER_VERSION}..."
-wget -q "$FLUTTER_URL" -O flutter.tar.xz
+curl -L "$FLUTTER_URL" -o flutter.tar.xz
 
 echo "==> Extracting Flutter..."
 tar xf flutter.tar.xz
