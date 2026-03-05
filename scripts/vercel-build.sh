@@ -1,17 +1,27 @@
 #!/bin/sh
 set -eu
 
+# Debug: print env info
+echo "==> Shell: $SHELL"
+echo "==> PATH: $PATH"
+echo "==> PWD: $PWD"
+which curl  && echo "curl: OK"  || echo "curl: MISSING"
+which tar   && echo "tar: OK"   || echo "tar: MISSING"
+which unzip && echo "unzip: OK" || echo "unzip: MISSING"
+which git   && echo "git: OK"   || echo "git: MISSING"
+
 FLUTTER_VERSION="3.27.4"
-FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
 
 echo "==> Downloading Flutter ${FLUTTER_VERSION}..."
-curl -L "$FLUTTER_URL" -o flutter.tar.xz
+curl -fSL \
+  "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
+  -o /tmp/flutter.tar.xz
 
-echo "==> Extracting Flutter..."
-tar xf flutter.tar.xz
-rm flutter.tar.xz
+echo "==> Extracting to /tmp..."
+tar xf /tmp/flutter.tar.xz -C /tmp
+rm /tmp/flutter.tar.xz
 
-export PATH="$PWD/flutter/bin:$PATH"
+export PATH="/tmp/flutter/bin:$PATH"
 
 echo "==> Configuring Flutter..."
 flutter config --enable-web --no-analytics
@@ -20,7 +30,7 @@ echo "==> Getting dependencies..."
 flutter pub get
 
 echo "==> Writing dart-defines..."
-cat > dart_defines.json << EOF
+cat > /tmp/dart_defines.json << DEFS
 {
   "ENABLE_BACKEND": "${ENABLE_BACKEND:-false}",
   "FIREBASE_API_KEY": "${FIREBASE_API_KEY:-}",
@@ -32,9 +42,9 @@ cat > dart_defines.json << EOF
   "FIREBASE_MEASUREMENT_ID": "${FIREBASE_MEASUREMENT_ID:-}",
   "GOOGLE_MAPS_API_KEY": "${GOOGLE_MAPS_API_KEY:-}"
 }
-EOF
+DEFS
 
 echo "==> Building web..."
-flutter build web --release --dart-define-from-file=dart_defines.json
+flutter build web --release --dart-define-from-file=/tmp/dart_defines.json
 
 echo "==> Done."
