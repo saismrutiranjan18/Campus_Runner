@@ -3,6 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // ── Helpers ─────────────────────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -18,7 +19,18 @@ service cloud.firestore {
     function isValidTransactionStatus(status) {
       return status in ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
     }
-    
+
+    // Check if a task is completed (used by ratings rule).
+    function taskIsCompleted(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId)).data.status == 'COMPLETED';
+    }
+
+    // Check if this rater has already rated this task (doc ID = taskId_raterId).
+    function hasRatedTask(taskId, raterId) {
+      return exists(/databases/$(database)/documents/ratings/$(taskId + '_' + raterId));
+    }
+
+    // ── Tasks ────────────────────────────────────────────────────────────────
     match /tasks/{taskId} {
       allow read: if resource.data.status == 'OPEN' || isAuthenticated();
       
@@ -60,6 +72,7 @@ service cloud.firestore {
         && resource.data.status == 'OPEN';
     }
     
+    // ── Transactions ─────────────────────────────────────────────────────────
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (
         resource.data.requesterId == request.auth.uid ||
@@ -83,6 +96,7 @@ service cloud.firestore {
       );
     }
     
+    // ── Users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isAuthenticated();
       
@@ -90,14 +104,59 @@ service cloud.firestore {
         && request.auth.uid == userId
         && request.resource.data.keys().hasAll(['email', 'displayName', 'phoneNumber', 'campusId', 'campusName', 'role', 'joinedAt']);
       
+      // Owner can update any field except core protected fields and rating/totalRatings
+      // (those are updated only via rating transactions).
       allow update: if isAuthenticated() 
         && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'totalRatings', 'completedTasks', 'userId', 'email', 'joinedAt']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'totalRatings', 'completedTasks', 'userId', 'email', 'joinedAt', 'isSuspended']);
       
       allow delete: if isAuthenticated() 
         && request.auth.uid == userId;
     }
     
+    // ── Ratings ──────────────────────────────────────────────────────────────
+    match /ratings/{ratingId} {
+      // Any authenticated user can read ratings.
+      allow read: if isAuthenticated();
+
+      // Create: must be authenticated, raterId matches auth user, task is completed,
+      // and user has not already rated this task.
+      allow create: if isAuthenticated()
+        && request.resource.data.raterId == request.auth.uid
+        && taskIsCompleted(request.resource.data.taskId)
+        && !hasRatedTask(request.resource.data.taskId, request.auth.uid)
+        && request.resource.data.keys().hasAll(['taskId', 'raterId', 'rateeId', 'rating', 'createdAt'])
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5;
+
+      // Update: only the original rater can edit, within 24 hours.
+      allow update: if isAuthenticated()
+        && resource.data.raterId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'review', 'categories', 'isEdited', 'editedAt'])
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
+    }
+
+    // ── Reports ──────────────────────────────────────────────────────────────
+    match /reports/{reportId} {
+      // Reporter can read their own reports. Admin reads handled server-side.
+      allow read: if isAuthenticated()
+        && resource.data.reporterId == request.auth.uid;
+
+      // Anyone authenticated can create a report for another user.
+      allow create: if isAuthenticated()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reportedUserId != request.auth.uid
+        && request.resource.data.keys().hasAll(['reporterId', 'reportedUserId', 'reason', 'description', 'status', 'createdAt'])
+        && request.resource.data.status == 'pending';
+
+      // Status updates handled via Cloud Functions / admin SDK only.
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ── Shops ────────────────────────────────────────────────────────────────
     match /shops/{shopId} {
       allow read: if true;
       
@@ -112,6 +171,7 @@ service cloud.firestore {
         && resource.data.createdBy == request.auth.uid;
     }
     
+    // ── Campuses ─────────────────────────────────────────────────────────────
     match /campuses/{campusId} {
       allow read: if true;
       allow write: if false;

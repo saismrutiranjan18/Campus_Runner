@@ -1,0 +1,30 @@
+# Flutter build artifacts
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase
+firebase.json
+.firebaserc
+firestore.rules
+storage.rules
+
+# Scripts
+scripts/
+
+# Documentation
+*.md
+!README.md

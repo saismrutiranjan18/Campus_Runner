@@ -1,3 +1,5 @@
+// lib/presentation/screens/profile/profile_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,14 +7,24 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/config/app_mode.dart';
 import '../../../logic/auth_provider.dart';
+import '../../../logic/report_provider.dart';
 import '../../../logic/user_provider.dart';
 import '../../../data/models/user_model.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
+import 'reports_screen.dart';
 import '../auth/phone_verification_screen.dart';
+import '../../widgets/cards/rating_breakdown_widget.dart';
+import '../../widgets/cards/recent_reviews_widget.dart';
+import '../../widgets/dialogs/report_user_dialog.dart';
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+  /// When [viewedUserId] is provided this screen shows another user's profile.
+  final String? viewedUserId;
+
+  const ProfileScreen({super.key, this.viewedUserId});
+
+  bool get _isSelf => viewedUserId == null;
 
   Future<void> _handleAuthAction(BuildContext context, WidgetRef ref) async {
     final authRepository = ref.read(authRepositoryProvider);
@@ -45,11 +57,15 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final user = ref.watch(authRepositoryProvider).getCurrentUser();
-    final userProfileAsync = ref.watch(currentUserProfileProvider);
+    final authUser = ref.watch(authRepositoryProvider).getCurrentUser();
     final isDemo = !AppMode.backendEnabled;
 
-    return userProfileAsync.when(
+    // Either view own profile or another user's profile
+    final profileAsync = _isSelf
+        ? ref.watch(currentUserProfileProvider)
+        : ref.watch(userProfileProvider(viewedUserId!));
+
+    return profileAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
         body: const Center(child: CircularProgressIndicator()),
@@ -59,12 +75,13 @@ class ProfileScreen extends ConsumerWidget {
         body: Center(child: Text('Error: $error')),
       ),
       data: (userProfile) {
-        final displayName = userProfile?.displayName ?? 
-            (user?.displayName?.trim().isNotEmpty == true
-                ? user!.displayName!
+        final displayName = userProfile?.displayName ??
+            (authUser?.displayName?.trim().isNotEmpty == true
+                ? authUser!.displayName!
                 : 'Campus Runner');
-        final email = userProfile?.email ?? 
-            (user?.email ?? (isDemo ? 'demo@campusrunner.app' : 'Guest user'));
+        final email = userProfile?.email ??
+            (authUser?.email ??
+                (isDemo ? 'demo@campusrunner.app' : 'Guest user'));
         final initials = displayName
             .split(' ')
             .where((part) => part.isNotEmpty)
@@ -72,8 +89,32 @@ class ProfileScreen extends ConsumerWidget {
             .map((part) => part[0].toUpperCase())
             .join();
 
+        final isBlocked = _isSelf
+            ? false
+            : (ref
+                    .watch(currentUserProfileProvider)
+                    .asData?.value
+                    ?.blockedUsers
+                    .contains(viewedUserId) ??
+                false);
+
         return Scaffold(
-          appBar: AppBar(title: const Text('Profile')),
+          appBar: AppBar(
+            title: Text(_isSelf ? 'Profile' : displayName),
+            actions: [
+              // Admin: Reports link (only on own profile)
+              if (_isSelf && userProfile?.isVerified == true)
+                IconButton(
+                  icon: Icon(PhosphorIcons.flag()),
+                  tooltip: 'Reports',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ReportsScreen()),
+                  ),
+                ),
+            ],
+          ),
           body: Stack(
             children: [
               Positioned.fill(
@@ -95,13 +136,15 @@ class ProfileScreen extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   children: [
+                    // ── User Card ──────────────────────────────────────────
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
                         color: colors.surface.withValues(alpha: 0.72),
                         border: Border.all(
-                          color: colors.outlineVariant.withValues(alpha: 0.3),
+                          color:
+                              colors.outlineVariant.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -111,13 +154,15 @@ class ProfileScreen extends ConsumerWidget {
                             backgroundColor: colors.primaryContainer,
                             backgroundImage: userProfile?.photoUrl != null
                                 ? NetworkImage(userProfile!.photoUrl!)
-                                : (user?.photoURL != null
-                                    ? NetworkImage(user!.photoURL!)
+                                : (authUser?.photoURL != null && _isSelf
+                                    ? NetworkImage(authUser!.photoURL!)
                                     : null),
-                            child: userProfile?.photoUrl == null && user?.photoURL == null
+                            child: userProfile?.photoUrl == null &&
+                                    (authUser?.photoURL == null || !_isSelf)
                                 ? Text(
                                     initials.isEmpty ? 'CR' : initials,
-                                    style: theme.textTheme.titleLarge?.copyWith(
+                                    style:
+                                        theme.textTheme.titleLarge?.copyWith(
                                       color: colors.onPrimaryContainer,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -131,37 +176,52 @@ class ProfileScreen extends ConsumerWidget {
                               children: [
                                 Text(
                                   displayName,
-                                  style: theme.textTheme.titleLarge?.copyWith(
+                                  style:
+                                      theme.textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  email,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colors.tertiaryContainer.withValues(alpha: 0.7),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    userProfile == null
-                                        ? 'Guest Mode'
-                                        : (userProfile.isVerified
-                                            ? 'Verified ${_getRoleLabel(userProfile.role)}'
-                                            : 'Unverified'),
-                                    style: theme.textTheme.labelLarge?.copyWith(
-                                      color: colors.onTertiaryContainer,
+                                if (_isSelf)
+                                  Text(
+                                    email,
+                                    style:
+                                        theme.textTheme.bodyMedium?.copyWith(
+                                      color: colors.onSurfaceVariant,
                                     ),
                                   ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colors.tertiaryContainer
+                                            .withValues(alpha: 0.7),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        userProfile == null
+                                            ? 'Guest Mode'
+                                            : (userProfile.isSuspended
+                                                ? '⛔ Suspended'
+                                                : userProfile.isVerified
+                                                    ? 'Verified ${_getRoleLabel(userProfile.role)}'
+                                                    : 'Unverified'),
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(
+                                          color: userProfile?.isSuspended ==
+                                                  true
+                                              ? colors.error
+                                              : colors.onTertiaryContainer,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -170,6 +230,8 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ).animate().fade(duration: 300.ms).slideY(begin: 0.08, end: 0),
                     const SizedBox(height: 16),
+
+                    // ── Stats Row ──────────────────────────────────────────
                     Row(
                       children: [
                         Expanded(
@@ -182,9 +244,10 @@ class ProfileScreen extends ConsumerWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: _StatCard(
-                            icon: PhosphorIcons.star(),
+                            icon: Icons.star,
                             title: 'Rating',
-                            value: userProfile?.rating.toStringAsFixed(1) ?? '0.0',
+                            value: userProfile?.rating.toStringAsFixed(1) ??
+                                '0.0',
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -201,85 +264,171 @@ class ProfileScreen extends ConsumerWidget {
                         .fade(delay: 120.ms, duration: 320.ms)
                         .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
-                    if (userProfile != null && !userProfile.isVerified)
+
+                    // ── Rating Breakdown ───────────────────────────────────
+                    if (userProfile != null && userProfile.totalRatings > 0) ...[
+                      RatingBreakdownWidget(
+                        userId: userProfile.userId,
+                        rating: userProfile.rating,
+                        totalRatings: userProfile.totalRatings,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Recent Reviews ─────────────────────────────────────
+                    if (userProfile != null) ...[
+                      RecentReviewsWidget(userId: userProfile.userId),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Trust & Safety Actions (other user's profile) ──────
+                    if (!_isSelf && userProfile != null) ...[
                       _ActionTile(
-                        icon: PhosphorIcons.shieldCheck(),
-                        title: 'Verify Phone Number',
-                        subtitle: 'Verify to accept tasks',
+                        icon: PhosphorIcons.warning(),
+                        title: 'Report User',
+                        subtitle: 'Flag this user for review',
+                        iconColor: colors.error,
                         onTap: () async {
-                          final result = await Navigator.push<bool>(
+                          final reported = await showReportUserDialog(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => PhoneVerificationScreen(
-                                userProfile: userProfile,
-                              ),
-                            ),
+                            reportedUserId: userProfile.userId,
                           );
-                          if (result == true && context.mounted) {
+                          if (reported == true && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Phone verified successfully!'),
+                                content: Text(
+                                    'Report submitted. Thank you for keeping the community safe.'),
                               ),
                             );
                           }
                         },
                       ),
-                    if (userProfile != null && !userProfile.isVerified)
                       const SizedBox(height: 10),
-                    if (userProfile != null)
                       _ActionTile(
-                        icon: PhosphorIcons.userCircleGear(),
-                        title: 'Edit profile',
-                        subtitle: 'Update your details',
+                        icon: isBlocked
+                            ? PhosphorIcons.userCheck()
+                            : PhosphorIcons.prohibit(),
+                        title: isBlocked ? 'Unblock User' : 'Block User',
+                        subtitle: isBlocked
+                            ? 'Allow this user to contact you again'
+                            : 'Stop this user from interacting with you',
+                        iconColor:
+                            isBlocked ? colors.primary : colors.error,
+                        onTap: () async {
+                          final currentUid = authUser?.uid;
+                          if (currentUid == null) return;
+                          final repo = ref.read(reportRepositoryProvider);
+                          if (isBlocked) {
+                            await repo.unblockUser(
+                                currentUid, userProfile.userId);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('User unblocked')),
+                              );
+                            }
+                          } else {
+                            await repo.blockUser(
+                                currentUid, userProfile.userId);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('User blocked')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Own Profile Actions ────────────────────────────────
+                    if (_isSelf) ...[
+                      if (userProfile != null && !userProfile.isVerified) ...[
+                        _ActionTile(
+                          icon: PhosphorIcons.shieldCheck(),
+                          title: 'Verify Phone Number',
+                          subtitle: 'Verify to accept tasks',
+                          onTap: () async {
+                            final result = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PhoneVerificationScreen(
+                                  userProfile: userProfile,
+                                ),
+                              ),
+                            );
+                            if (result == true && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Phone verified successfully!'),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      if (userProfile != null) ...[
+                        _ActionTile(
+                          icon: PhosphorIcons.userCircleGear(),
+                          title: 'Edit profile',
+                          subtitle: 'Update your details',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EditProfileScreen(userProfile: userProfile),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      _ActionTile(
+                        icon: PhosphorIcons.mapTrifold(),
+                        title: 'Saved routes',
+                        subtitle: 'Manage your frequently used paths',
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => EditProfileScreen(userProfile: userProfile),
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Saved routes coming soon')),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _ActionTile(
+                        icon: PhosphorIcons.bellRinging(),
+                        title: 'Notification preferences',
+                        subtitle: 'Customize your alerts',
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Notification settings soon'),
                             ),
                           );
                         },
                       ),
-                    if (userProfile != null) const SizedBox(height: 10),
-                    _ActionTile(
-                      icon: PhosphorIcons.mapTrifold(),
-                      title: 'Saved routes',
-                      subtitle: 'Manage your frequently used paths',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Saved routes coming soon')),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    _ActionTile(
-                      icon: PhosphorIcons.bellRinging(),
-                      title: 'Notification preferences',
-                      subtitle: 'Customize your alerts',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Notification settings soon'),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      onPressed: () => _handleAuthAction(context, ref),
-                      icon: Icon(
-                        user == null
-                            ? PhosphorIcons.signIn()
-                            : PhosphorIcons.signOut(),
-                      ),
-                      label: Text(user == null ? 'Sign In' : 'Log Out'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      const SizedBox(height: 18),
+                      FilledButton.icon(
+                        onPressed: () => _handleAuthAction(context, ref),
+                        icon: Icon(
+                          authUser == null
+                              ? PhosphorIcons.signIn()
+                              : PhosphorIcons.signOut(),
                         ),
-                      ),
-                    ).animate().fade(delay: 220.ms, duration: 350.ms),
+                        label:
+                            Text(authUser == null ? 'Sign In' : 'Log Out'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ).animate().fade(delay: 220.ms, duration: 350.ms),
+                    ],
                   ],
                 ),
               ),
@@ -302,6 +451,8 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+// ── Reusable Widgets ────────────────────────────────────────────────────────────
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.icon,
@@ -323,7 +474,8 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: colors.surface.withValues(alpha: 0.7),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.35)),
+        border:
+            Border.all(color: colors.outlineVariant.withValues(alpha: 0.35)),
       ),
       child: Column(
         children: [
@@ -354,12 +506,14 @@ class _ActionTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.iconColor,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -376,7 +530,8 @@ class _ActionTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: colors.surface.withValues(alpha: 0.68),
-            border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.28)),
+            border: Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.28)),
           ),
           child: Row(
             children: [
@@ -385,9 +540,13 @@ class _ActionTile extends StatelessWidget {
                 height: 38,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: colors.primaryContainer.withValues(alpha: 0.75),
+                  color: (iconColor ?? colors.onPrimaryContainer)
+                      .withValues(alpha: 0.12),
                 ),
-                child: Icon(icon, color: colors.onPrimaryContainer),
+                child: Icon(
+                  icon,
+                  color: iconColor ?? colors.onPrimaryContainer,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(

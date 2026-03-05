@@ -4,7 +4,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../data/models/task_model.dart';
 import '../../../logic/auth_provider.dart';
+import '../../../logic/rating_provider.dart';
 import '../../../core/utils/formatters.dart';
+import '../../widgets/dialogs/rating_dialog.dart';
 import 'live_tracking_screen.dart';
 
 class MyTasksScreen extends ConsumerWidget {
@@ -71,7 +73,7 @@ class MyTasksScreen extends ConsumerWidget {
             itemCount: tasks.length,
             itemBuilder: (context, index) {
               final task = tasks[index];
-              return _TaskItem(task: task);
+              return _TaskItem(task: task, currentUserId: currentUser.uid);
             },
           );
         },
@@ -80,15 +82,22 @@ class MyTasksScreen extends ConsumerWidget {
   }
 }
 
-class _TaskItem extends StatelessWidget {
+class _TaskItem extends ConsumerWidget {
   final TaskModel task;
+  final String currentUserId;
 
-  const _TaskItem({required this.task});
+  const _TaskItem({required this.task, required this.currentUserId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isActive = task.status == 'IN_PROGRESS';
+    final isCompleted = task.status == 'COMPLETED';
+
+    // Check if already rated (key = taskId|raterId)
+    final ratingKey = '${task.id}|$currentUserId';
+    final existingRatingAsync = ref.watch(taskRatingProvider(ratingKey));
+    final alreadyRated = existingRatingAsync.asData?.value != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -164,6 +173,7 @@ class _TaskItem extends StatelessWidget {
               fontSize: 12,
             ),
           ),
+          // Track Runner button (IN_PROGRESS)
           if (isActive && task.runnerId != null) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -184,6 +194,55 @@ class _TaskItem extends StatelessWidget {
                   foregroundColor: Colors.white,
                 ),
               ),
+            ),
+          ],
+          // Rate Runner button (COMPLETED, not yet rated)
+          if (isCompleted && task.runnerId != null && !alreadyRated) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final rated = await showRatingDialog(
+                    context,
+                    taskId: task.id,
+                    rateeId: task.runnerId!,
+                    rateeeName: task.runnerName ?? 'Runner',
+                    isRatingRunner: true,
+                  );
+                  if (rated == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Rating submitted! Thank you.')),
+                    );
+                  }
+                },
+                icon: Icon(Icons.star, color: Colors.amber),
+                label: const Text('Rate Runner'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.amber.shade800,
+                  side: const BorderSide(color: Colors.amber),
+                ),
+              ),
+            ),
+          ],
+          // Already rated badge
+          if (isCompleted && task.runnerId != null && alreadyRated) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(PhosphorIcons.checkCircle(),
+                    size: 14, color: Colors.green),
+                const SizedBox(width: 4),
+                Text(
+                  'Runner rated',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -211,6 +270,7 @@ class _StatusChip extends StatelessWidget {
   final String status;
 
   const _StatusChip({required this.status});
+
 
   @override
   Widget build(BuildContext context) {

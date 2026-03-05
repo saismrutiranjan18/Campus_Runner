@@ -17,6 +17,8 @@ class UserModel {
   final bool isVerified;
   final bool isActive;
   final String? fcmToken;
+  final bool isSuspended;
+  final List<String> blockedUsers;
 
   UserModel({
     required this.userId,
@@ -35,6 +37,8 @@ class UserModel {
     this.isVerified = false,
     this.isActive = true,
     this.fcmToken,
+    this.isSuspended = false,
+    this.blockedUsers = const [],
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String docId) {
@@ -60,6 +64,8 @@ class UserModel {
       isVerified: map['isVerified'] ?? false,
       isActive: map['isActive'] ?? true,
       fcmToken: map['fcmToken'],
+      isSuspended: map['isSuspended'] ?? false,
+      blockedUsers: List<String>.from(map['blockedUsers'] ?? []),
     );
   }
 
@@ -80,6 +86,8 @@ class UserModel {
       'isVerified': isVerified,
       'isActive': isActive,
       if (fcmToken != null) 'fcmToken': fcmToken,
+      'isSuspended': isSuspended,
+      'blockedUsers': blockedUsers,
     };
   }
 
@@ -100,6 +108,8 @@ class UserModel {
     bool? isVerified,
     bool? isActive,
     String? fcmToken,
+    bool? isSuspended,
+    List<String>? blockedUsers,
   }) {
     return UserModel(
       userId: userId ?? this.userId,
@@ -118,6 +128,8 @@ class UserModel {
       isVerified: isVerified ?? this.isVerified,
       isActive: isActive ?? this.isActive,
       fcmToken: fcmToken ?? this.fcmToken,
+      isSuspended: isSuspended ?? this.isSuspended,
+      blockedUsers: blockedUsers ?? this.blockedUsers,
     );
   }
 }
