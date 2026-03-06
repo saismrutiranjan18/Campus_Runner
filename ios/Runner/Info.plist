@@ -49,5 +49,15 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Campus Runner uses the microphone for voice commands.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Campus Runner needs your location to track deliveries in real-time.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Campus Runner needs your location to track deliveries even when the app is in the background.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Campus Runner needs your location to track deliveries even when the app is in the background.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

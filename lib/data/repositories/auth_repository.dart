@@ -1,12 +1,21 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/config/app_mode.dart';
+import '../models/user_model.dart';
+import 'user_repository.dart';
 
 class AuthResult {
   final User? user;
+  final UserModel? userProfile;
+  final bool isNewUser;
   final String? errorMessage;
 
-  const AuthResult({this.user, this.errorMessage});
+  const AuthResult({
+    this.user,
+    this.userProfile,
+    this.isNewUser = false,
+    this.errorMessage,
+  });
 }
 
 class AuthRepository {
@@ -16,6 +25,8 @@ class AuthRepository {
     scopes: ['email'],
     hostedDomain: allowedDomain,
   );
+
+  final UserRepository _userRepository = UserRepository();
 
   Future<AuthResult> signInWithGoogle() async {
     if (!AppMode.backendEnabled) {
@@ -50,7 +61,38 @@ class AuthRepository {
         credential,
       );
 
-      return AuthResult(user: userCredential.user);
+      final user = userCredential.user;
+      if (user == null) {
+        return const AuthResult(errorMessage: 'Authentication failed');
+      }
+
+      final userExists = await _userRepository.userExists(user.uid);
+
+      UserModel? userProfile;
+
+      if (!userExists) {
+        userProfile = UserModel(
+          userId: user.uid,
+          email: user.email ?? '',
+          displayName: user.displayName ?? 'Campus Runner',
+          phoneNumber: user.phoneNumber ?? '',
+          photoUrl: user.photoURL,
+          campusId: 'vit-bhopal',
+          campusName: 'VIT Bhopal',
+          role: UserRole.both,
+          joinedAt: DateTime.now(),
+        );
+
+        await _userRepository.createUserProfile(userProfile);
+      } else {
+        userProfile = await _userRepository.getUserProfile(user.uid);
+      }
+
+      return AuthResult(
+        user: user,
+        userProfile: userProfile,
+        isNewUser: !userExists,
+      );
     } on FirebaseAuthException catch (e) {
       return AuthResult(errorMessage: e.message ?? e.code);
     } catch (e) {
@@ -60,4 +102,11 @@ class AuthRepository {
 
   User? getCurrentUser() =>
       AppMode.backendEnabled ? FirebaseAuth.instance.currentUser : null;
+
+  Future<void> signOut() async {
+    if (!AppMode.backendEnabled) return;
+
+    await _googleSignIn.signOut();
+    await FirebaseAuth.instance.signOut();
+  }
 }

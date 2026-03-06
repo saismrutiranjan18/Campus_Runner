@@ -1,0 +1,120 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidTaskStatus(status) {
+      return status in ['OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+    }
+    
+    function isValidTransactionStatus(status) {
+      return status in ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
+    }
+    
+    match /tasks/{taskId} {
+      allow read: if resource.data.status == 'OPEN' || isAuthenticated();
+      
+      allow create: if isAuthenticated() 
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.status == 'OPEN'
+        && isValidTaskStatus(request.resource.data.status)
+        && request.resource.data.keys().hasAll(['requesterId', 'title', 'pickup', 'drop', 'price', 'status', 'createdAt', 'campusId', 'campusName', 'transportMode'])
+        && !request.resource.data.keys().hasAny(['runnerId', 'acceptedAt']);
+      
+      allow update: if isAuthenticated() && (
+        (resource.data.status == 'OPEN' 
+          && request.resource.data.status == 'IN_PROGRESS'
+          && request.resource.data.runnerId == request.auth.uid
+          && resource.data.runnerId == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'runnerId', 'runnerName', 'runnerPhone', 'acceptedAt']))
+        ||
+        (resource.data.status == 'IN_PROGRESS'
+          && request.resource.data.status == 'COMPLETED'
+          && resource.data.runnerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']))
+        ||
+        (resource.data.requesterId == request.auth.uid
+          && request.resource.data.status == 'CANCELLED'
+          && resource.data.status in ['OPEN', 'IN_PROGRESS']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+        ||
+        (resource.data.status == 'IN_PROGRESS'
+          && resource.data.runnerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['runnerLatitude', 'runnerLongitude', 'locationLastUpdated']))
+        ||
+        (resource.data.requesterId == request.auth.uid
+          && resource.data.status == 'COMPLETED'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentVerified']))
+      );
+      
+      allow delete: if isAuthenticated() 
+        && resource.data.requesterId == request.auth.uid
+        && resource.data.status == 'OPEN';
+    }
+    
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.requesterId == request.auth.uid ||
+        resource.data.runnerId == request.auth.uid
+      );
+      
+      allow create: if isAuthenticated()
+        && request.resource.data.status == 'PENDING'
+        && isValidTransactionStatus(request.resource.data.status)
+        && request.resource.data.keys().hasAll(['taskId', 'requesterId', 'runnerId', 'amount', 'status', 'type', 'createdAt'])
+        && (request.resource.data.requesterId == request.auth.uid || request.resource.data.runnerId == request.auth.uid);
+      
+      allow update: if isAuthenticated() && (
+        (resource.data.requesterId == request.auth.uid && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt', 'transactionReference']) &&
+         isValidTransactionStatus(request.resource.data.status))
+        ||
+        (resource.data.runnerId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+         request.resource.data.status in ['COMPLETED', 'FAILED'])
+      );
+    }
+    
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() 
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['email', 'displayName', 'phoneNumber', 'campusId', 'campusName', 'role', 'joinedAt']);
+      
+      allow update: if isAuthenticated() 
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'totalRatings', 'completedTasks', 'userId', 'email', 'joinedAt']);
+      
+      allow delete: if isAuthenticated() 
+        && request.auth.uid == userId;
+    }
+    
+    match /shops/{shopId} {
+      allow read: if true;
+      
+      allow create: if isAuthenticated()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.keys().hasAll(['campusId', 'campusName', 'name', 'category', 'contactPhone', 'location', 'createdBy', 'createdAt']);
+      
+      allow update: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
+      
+      allow delete: if isAuthenticated() 
+        && resource.data.createdBy == request.auth.uid;
+    }
+    
+    match /campuses/{campusId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

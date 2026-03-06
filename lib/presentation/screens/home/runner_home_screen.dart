@@ -10,11 +10,15 @@ import '../../../core/utils/formatters.dart';
 import '../../../logic/auth_provider.dart';
 import '../../../logic/campus_provider.dart';
 import '../../../logic/task_provider.dart';
+import '../../../logic/location_provider.dart';
+import '../../../logic/user_provider.dart';
+import '../../../core/utils/formatters.dart';
 import '../auth/login_screen.dart';
 import 'campuses_screen.dart';
 import 'register_shop_screen.dart';
 import 'requester_home_screen.dart';
 import 'smart_route_screen.dart';
+import '../profile/profile_screen.dart';
 
 class RunnerHomeScreen extends ConsumerStatefulWidget {
   const RunnerHomeScreen({super.key});
@@ -55,6 +59,14 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
           backgroundColor: Colors.red,
         ),
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Could not open document."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -116,6 +128,17 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
             onPressed: () {},
             icon: Icon(PhosphorIcons.bell()),
             tooltip: 'Notifications',
+          ),
+          IconButton(onPressed: () {}, icon: Icon(PhosphorIcons.funnel())),
+          IconButton(onPressed: () {}, icon: Icon(PhosphorIcons.bell())),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+            icon: Icon(PhosphorIcons.userCircle()),
           ),
           PopupMenuButton<String>(
             onSelected: (value) async {
@@ -688,6 +711,50 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(14),
+                                      try {
+                                        final currentUser = ref.read(authRepositoryProvider).getCurrentUser();
+                                        if (currentUser == null) {
+                                          throw Exception('User not authenticated');
+                                        }
+
+                                        final userProfile = await ref.read(userRepositoryProvider).getUserProfile(currentUser.uid);
+                                        if (userProfile == null) {
+                                          throw Exception('User profile not found');
+                                        }
+
+                                        final locationService = ref.read(locationServiceProvider);
+                                        final hasPermission = await locationService.requestLocationPermission();
+                                        
+                                        if (!hasPermission) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Location permission required for tracking'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                          return;
+                                        }
+                                        
+                                        await ref
+                                            .read(taskRepositoryProvider)
+                                            .acceptTask(
+                                              taskId: task.id,
+                                              runnerId: currentUser.uid,
+                                              runnerName: userProfile.displayName,
+                                              runnerPhone: userProfile.phoneNumber,
+                                            );
+
+                                        locationService.startLocationTracking(task.id);
+
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                "Task Accepted! Location tracking started.",
                                               ),
                                             ),
                                             icon: const Icon(
@@ -697,6 +764,35 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                                           ),
                                         ),
                                     ],
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "Error accepting task: $e",
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black87,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.check_circle,
+                                      size: 18,
+                                    ),
+                                    label: const Text("Accept"),
                                   ),
                                 ],
                               ),
