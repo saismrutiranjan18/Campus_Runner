@@ -180,6 +180,16 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
+
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.personSimpleRun(),
+                            title: 'Total Runs',
+                            value: '${userProfile?.completedTasks ?? 0}',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
                         Expanded(
                           child: _StatCard(
                             icon: PhosphorIcons.star(),
@@ -188,6 +198,7 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
+
                         Expanded(
                           child: _StatCard(
                             icon: PhosphorIcons.users(),
@@ -197,9 +208,9 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                       ],
                     )
-                        .animate()
-                        .fade(delay: 120.ms, duration: 320.ms)
-                        .slideY(begin: 0.1, end: 0),
+                    .animate()
+                    .fade(delay: 120.ms, duration: 320.ms)
+                    .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
                     if (userProfile != null && !userProfile.isVerified)
                       _ActionTile(
