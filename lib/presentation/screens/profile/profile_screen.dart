@@ -209,6 +209,46 @@ class ProfileScreen extends ConsumerWidget {
                         .animate()
                         .fade(delay: 120.ms, duration: 320.ms)
                         .slideY(begin: 0.1, end: 0),
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.checkCircle(),
+                            title: 'Completed',
+                            value: '${userProfile?.completedTasks ?? 0}',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.personSimpleRun(),
+                            title: 'Total Runs',
+                            value: '${userProfile?.completedTasks ?? 0}',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.star(),
+                            title: 'Rating',
+                            value: userProfile?.rating.toStringAsFixed(1) ?? '0.0',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.users(),
+                            title: 'Reviews',
+                            value: '${userProfile?.totalRatings ?? 0}',
+                          ),
+                        ),
+                      ],
+                    )
+                    .animate()
+                    .fade(delay: 120.ms, duration: 320.ms)
+                    .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
                     if (userProfile != null && !userProfile.isVerified)
                       _ActionTile(
