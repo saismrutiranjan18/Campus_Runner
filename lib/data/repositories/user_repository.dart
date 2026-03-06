@@ -3,7 +3,7 @@ import '../../core/config/app_mode.dart';
 import '../models/user_model.dart';
 
 class UserRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
 
   Future<void> createUserProfile(UserModel user) async {
     if (!AppMode.backendEnabled) return;
@@ -26,17 +26,16 @@ class UserRepository {
       return Stream.value(null);
     }
 
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .snapshots()
-        .map((doc) {
+    return _firestore.collection('users').doc(userId).snapshots().map((doc) {
       if (!doc.exists) return null;
       return UserModel.fromMap(doc.data()!, doc.id);
     });
   }
 
-  Future<void> updateUserProfile(String userId, Map<String, dynamic> updates) async {
+  Future<void> updateUserProfile(
+    String userId,
+    Map<String, dynamic> updates,
+  ) async {
     if (!AppMode.backendEnabled) return;
 
     await _firestore.collection('users').doc(userId).update(updates);
@@ -76,7 +75,8 @@ class UserRepository {
     final currentTotal = userDoc.data()?['totalRatings'] ?? 0;
 
     final totalRatings = currentTotal + 1;
-    final updatedRating = ((currentRating * currentTotal) + newRating) / totalRatings;
+    final updatedRating =
+        ((currentRating * currentTotal) + newRating) / totalRatings;
 
     await _firestore.collection('users').doc(userId).update({
       'rating': updatedRating,

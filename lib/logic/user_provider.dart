@@ -1,13 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/config/app_mode.dart';
 import '../data/repositories/user_repository.dart';
 import '../data/models/user_model.dart';
 
 final userRepositoryProvider = Provider((ref) => UserRepository());
 
 final currentUserProfileProvider = StreamProvider<UserModel?>((ref) {
+  if (!AppMode.backendEnabled) {
+    return Stream.value(null);
+  }
+
   final authUser = FirebaseAuth.instance.currentUser;
-  
+
   if (authUser == null) {
     return Stream.value(null);
   }
@@ -15,6 +20,9 @@ final currentUserProfileProvider = StreamProvider<UserModel?>((ref) {
   return ref.watch(userRepositoryProvider).getUserProfileStream(authUser.uid);
 });
 
-final userProfileProvider = StreamProvider.family<UserModel?, String>((ref, userId) {
+final userProfileProvider = StreamProvider.family<UserModel?, String>((
+  ref,
+  userId,
+) {
   return ref.watch(userRepositoryProvider).getUserProfileStream(userId);
 });
