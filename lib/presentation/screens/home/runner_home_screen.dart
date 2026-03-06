@@ -15,6 +15,7 @@ import '../../../logic/user_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../auth/login_screen.dart';
 import '../../widgets/cards/task_card.dart';
+import '../../widgets/loaders/aurora_loader.dart';
 import 'campuses_screen.dart';
 import 'register_shop_screen.dart';
 import 'requester_home_screen.dart';
@@ -188,29 +189,23 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                   },
                 );
               },
-              loading: () => const LinearProgressIndicator(),
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: AuroraLoader(
+                  size: 42,
+                  strokeWidth: 6,
+                  label: 'Loading campuses',
+                ),
+              ),
               error: (error, _) => Text('Error: $error'),
             ),
           ),
           Expanded(
             child: tasksAsync.when(
               // A. LOADING STATE
-              loading: () => Skeletonizer(
-                enabled: true,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: 6,
-                  itemBuilder: (context, index) {
-                    return const TaskCard(
-                      title: "Loading Task Title...",
-                      pickup: "Loading Location...",
-                      drop: "Loading Drop...",
-                      price: "...",
-                      time: "...",
-                      transportMode: "Walking",
-                    );
-                  },
-                ),
+              loading: () => const FullScreenAuroraLoader(
+                label: 'Fetching tasks',
+                subtitle: 'Finding the latest campus requests for you',
               ),
 
               // B. ERROR STATE
@@ -302,41 +297,61 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                                       }
 
                                       try {
-                                        final currentUser = ref.read(authRepositoryProvider).getCurrentUser();
+                                        final currentUser = ref
+                                            .read(authRepositoryProvider)
+                                            .getCurrentUser();
                                         if (currentUser == null) {
-                                          throw Exception('User not authenticated');
+                                          throw Exception(
+                                            'User not authenticated',
+                                          );
                                         }
 
-                                        final userProfile = await ref.read(userRepositoryProvider).getUserProfile(currentUser.uid);
+                                        final userProfile = await ref
+                                            .read(userRepositoryProvider)
+                                            .getUserProfile(currentUser.uid);
                                         if (userProfile == null) {
-                                          throw Exception('User profile not found');
+                                          throw Exception(
+                                            'User profile not found',
+                                          );
                                         }
 
-                                        final locationService = ref.read(locationServiceProvider);
-                                        final hasPermission = await locationService.requestLocationPermission();
-                                        
+                                        final locationService = ref.read(
+                                          locationServiceProvider,
+                                        );
+                                        final hasPermission =
+                                            await locationService
+                                                .requestLocationPermission();
+
                                         if (!hasPermission) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
-                                                content: Text('Location permission required for tracking'),
+                                                content: Text(
+                                                  'Location permission required for tracking',
+                                                ),
                                                 backgroundColor: Colors.red,
                                               ),
                                             );
                                           }
                                           return;
                                         }
-                                        
+
                                         await ref
                                             .read(taskRepositoryProvider)
                                             .acceptTask(
                                               taskId: task.id,
                                               runnerId: currentUser.uid,
-                                              runnerName: userProfile.displayName,
-                                              runnerPhone: userProfile.phoneNumber,
+                                              runnerName:
+                                                  userProfile.displayName,
+                                              runnerPhone:
+                                                  userProfile.phoneNumber,
                                             );
 
-                                        locationService.startLocationTracking(task.id);
+                                        locationService.startLocationTracking(
+                                          task.id,
+                                        );
 
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(

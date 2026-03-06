@@ -8,6 +8,7 @@ import '../../../logic/auth_provider.dart';
 import '../../../logic/user_provider.dart';
 import '../../../data/models/user_model.dart';
 import '../auth/login_screen.dart';
+import '../../widgets/loaders/aurora_loader.dart';
 import 'edit_profile_screen.dart';
 import '../auth/phone_verification_screen.dart';
 
@@ -52,18 +53,23 @@ class ProfileScreen extends ConsumerWidget {
     return userProfileAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const FullScreenAuroraLoader(
+          label: 'Loading profile',
+          subtitle: 'Preparing your runner dashboard',
+        ),
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
         body: Center(child: Text('Error: $error')),
       ),
       data: (userProfile) {
-        final displayName = userProfile?.displayName ?? 
+        final displayName =
+            userProfile?.displayName ??
             (user?.displayName?.trim().isNotEmpty == true
                 ? user!.displayName!
                 : 'Campus Runner');
-        final email = userProfile?.email ?? 
+        final email =
+            userProfile?.email ??
             (user?.email ?? (isDemo ? 'demo@campusrunner.app' : 'Guest user'));
         final initials = displayName
             .split(' ')
@@ -112,9 +118,11 @@ class ProfileScreen extends ConsumerWidget {
                             backgroundImage: userProfile?.photoUrl != null
                                 ? NetworkImage(userProfile!.photoUrl!)
                                 : (user?.photoURL != null
-                                    ? NetworkImage(user!.photoURL!)
-                                    : null),
-                            child: userProfile?.photoUrl == null && user?.photoURL == null
+                                      ? NetworkImage(user!.photoURL!)
+                                      : null),
+                            child:
+                                userProfile?.photoUrl == null &&
+                                    user?.photoURL == null
                                 ? Text(
                                     initials.isEmpty ? 'CR' : initials,
                                     style: theme.textTheme.titleLarge?.copyWith(
@@ -149,15 +157,17 @@ class ProfileScreen extends ConsumerWidget {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: colors.tertiaryContainer.withValues(alpha: 0.7),
+                                    color: colors.tertiaryContainer.withValues(
+                                      alpha: 0.7,
+                                    ),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
                                     userProfile == null
                                         ? 'Guest Mode'
                                         : (userProfile.isVerified
-                                            ? 'Verified ${_getRoleLabel(userProfile.role)}'
-                                            : 'Unverified'),
+                                              ? 'Verified ${_getRoleLabel(userProfile.role)}'
+                                              : 'Unverified'),
                                     style: theme.textTheme.labelLarge?.copyWith(
                                       color: colors.onTertiaryContainer,
                                     ),
@@ -171,32 +181,34 @@ class ProfileScreen extends ConsumerWidget {
                     ).animate().fade(duration: 300.ms).slideY(begin: 0.08, end: 0),
                     const SizedBox(height: 16),
                     Row(
-                      children: [
-                        Expanded(
-                          child: _StatCard(
-                            icon: PhosphorIcons.checkCircle(),
-                            title: 'Completed',
-                            value: '${userProfile?.completedTasks ?? 0}',
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _StatCard(
-                            icon: PhosphorIcons.star(),
-                            title: 'Rating',
-                            value: userProfile?.rating.toStringAsFixed(1) ?? '0.0',
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _StatCard(
-                            icon: PhosphorIcons.users(),
-                            title: 'Reviews',
-                            value: '${userProfile?.totalRatings ?? 0}',
-                          ),
-                        ),
-                      ],
-                    )
+                          children: [
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.checkCircle(),
+                                title: 'Completed',
+                                value: '${userProfile?.completedTasks ?? 0}',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.star(),
+                                title: 'Rating',
+                                value:
+                                    userProfile?.rating.toStringAsFixed(1) ??
+                                    '0.0',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.users(),
+                                title: 'Reviews',
+                                value: '${userProfile?.totalRatings ?? 0}',
+                              ),
+                            ),
+                          ],
+                        )
                         .animate()
                         .fade(delay: 120.ms, duration: 320.ms)
                         .slideY(begin: 0.1, end: 0),
@@ -235,7 +247,8 @@ class ProfileScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => EditProfileScreen(userProfile: userProfile),
+                              builder: (_) =>
+                                  EditProfileScreen(userProfile: userProfile),
                             ),
                           );
                         },
@@ -247,7 +260,9 @@ class ProfileScreen extends ConsumerWidget {
                       subtitle: 'Manage your frequently used paths',
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Saved routes coming soon')),
+                          const SnackBar(
+                            content: Text('Saved routes coming soon'),
+                          ),
                         );
                       },
                     ),
@@ -323,7 +338,9 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: colors.surface.withValues(alpha: 0.7),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         children: [
@@ -376,7 +393,9 @@ class _ActionTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: colors.surface.withValues(alpha: 0.68),
-            border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.28)),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.28),
+            ),
           ),
           child: Row(
             children: [

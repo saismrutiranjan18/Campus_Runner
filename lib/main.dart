@@ -7,7 +7,7 @@ import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'core/config/app_mode.dart';
-import 'presentation/screens/home/runner_home_screen.dart';
+import 'presentation/screens/splash_screen.dart';
 
 FirebaseOptions? _firebaseOptionsFromEnv() {
   const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
@@ -49,7 +49,9 @@ void main() async {
   // 2. Initialize Firebase only when backend mode is enabled.
   if (AppMode.backendEnabled) {
     try {
-      final options = _needsExplicitOptions() ? _firebaseOptionsFromEnv() : null;
+      final options = _needsExplicitOptions()
+          ? _firebaseOptionsFromEnv()
+          : null;
       if (options == null && _needsExplicitOptions()) {
         throw Exception(
           'Missing Firebase options. Provide --dart-define values for web/windows.',
@@ -96,7 +98,7 @@ class CampusRunnerApp extends StatelessWidget {
       themeMode: ThemeMode.system, // Auto-switch based on phone settings
       // --- HOME SCREEN ---
       // Guest browsing by default.
-      home: const RunnerHomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
