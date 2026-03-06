@@ -3,6 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../../core/config/app_mode.dart';
 import '../../../logic/auth_provider.dart';
 import '../../../logic/user_provider.dart';
@@ -110,9 +112,9 @@ class ProfileScreen extends ConsumerWidget {
                             radius: 34,
                             backgroundColor: colors.primaryContainer,
                             backgroundImage: userProfile?.photoUrl != null
-                                ? NetworkImage(userProfile!.photoUrl!)
+                                ? CachedNetworkImageProvider(userProfile!.photoUrl!)
                                 : (user?.photoURL != null
-                                    ? NetworkImage(user!.photoURL!)
+                                    ? CachedNetworkImageProvider(user!.photoURL!)
                                     : null),
                             child: userProfile?.photoUrl == null && user?.photoURL == null
                                 ? Text(
