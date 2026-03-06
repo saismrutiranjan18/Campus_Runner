@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../data/models/task_model.dart';
 import '../../../logic/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
+import '../../widgets/empty_state_widget.dart';
 import 'live_tracking_screen.dart';
 
 class MyTasksScreen extends ConsumerWidget {
@@ -43,19 +44,10 @@ class MyTasksScreen extends ConsumerWidget {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    PhosphorIcons.package(),
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('No tasks yet'),
-                ],
-              ),
+            return EmptyStateWidget(
+              icon: PhosphorIcons.package(),
+              title: 'No tasks yet',
+              subtitle: 'You haven\'t posted any tasks. Create one to get started!',
             );
           }
 

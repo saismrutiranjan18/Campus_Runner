@@ -21,6 +21,7 @@ import 'requester_home_screen.dart';
 import 'smart_route_screen.dart';
 import '../profile/profile_screen.dart';
 import '../tracking/leaderboard_screen.dart';
+import '../../widgets/empty_state_widget.dart';
 
 // Use ConsumerStatefulWidget to listen to Riverpod Providers
 class RunnerHomeScreen extends ConsumerStatefulWidget {
@@ -232,22 +233,10 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
               // C. DATA STATE
               data: (tasks) {
                 if (tasks.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          PhosphorIcons.smileySad(),
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "No tasks available right now.",
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      ],
-                    ),
+                  return EmptyStateWidget(
+                    icon: PhosphorIcons.smileySad(),
+                    title: 'No available tasks',
+                    subtitle: 'Check back later or change the campus filter.',
                   );
                 }
 
