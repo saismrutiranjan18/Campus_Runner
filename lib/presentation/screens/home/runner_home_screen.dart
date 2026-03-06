@@ -12,6 +12,7 @@ import '../../../logic/task_provider.dart';
 import '../../../logic/campus_provider.dart';
 import '../../../logic/location_provider.dart';
 import '../../../logic/user_provider.dart';
+import '../../../core/themes/theme_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../auth/login_screen.dart';
 import '../../widgets/cards/task_card.dart';
@@ -74,6 +75,8 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
     final tasksAsync = ref.watch(tasksStreamProvider);
     final campusesAsync = ref.watch(campusesStreamProvider);
     final selectedCampusId = ref.watch(selectedCampusProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDarkMode = themeMode == ThemeMode.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -90,6 +93,15 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
               );
             },
             icon: const Icon(Icons.alt_route),
+          ),
+          IconButton(
+            onPressed: () {
+              ref.read(themeModeProvider.notifier).toggleTheme();
+            },
+            tooltip: isDarkMode
+                ? 'Switch to light mode'
+                : 'Switch to dark mode',
+            icon: Icon(isDarkMode ? PhosphorIcons.sun() : PhosphorIcons.moon()),
           ),
           IconButton(onPressed: () {}, icon: Icon(PhosphorIcons.funnel())),
           IconButton(onPressed: () {}, icon: Icon(PhosphorIcons.bell())),
@@ -302,41 +314,61 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                                       }
 
                                       try {
-                                        final currentUser = ref.read(authRepositoryProvider).getCurrentUser();
+                                        final currentUser = ref
+                                            .read(authRepositoryProvider)
+                                            .getCurrentUser();
                                         if (currentUser == null) {
-                                          throw Exception('User not authenticated');
+                                          throw Exception(
+                                            'User not authenticated',
+                                          );
                                         }
 
-                                        final userProfile = await ref.read(userRepositoryProvider).getUserProfile(currentUser.uid);
+                                        final userProfile = await ref
+                                            .read(userRepositoryProvider)
+                                            .getUserProfile(currentUser.uid);
                                         if (userProfile == null) {
-                                          throw Exception('User profile not found');
+                                          throw Exception(
+                                            'User profile not found',
+                                          );
                                         }
 
-                                        final locationService = ref.read(locationServiceProvider);
-                                        final hasPermission = await locationService.requestLocationPermission();
-                                        
+                                        final locationService = ref.read(
+                                          locationServiceProvider,
+                                        );
+                                        final hasPermission =
+                                            await locationService
+                                                .requestLocationPermission();
+
                                         if (!hasPermission) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
-                                                content: Text('Location permission required for tracking'),
+                                                content: Text(
+                                                  'Location permission required for tracking',
+                                                ),
                                                 backgroundColor: Colors.red,
                                               ),
                                             );
                                           }
                                           return;
                                         }
-                                        
+
                                         await ref
                                             .read(taskRepositoryProvider)
                                             .acceptTask(
                                               taskId: task.id,
                                               runnerId: currentUser.uid,
-                                              runnerName: userProfile.displayName,
-                                              runnerPhone: userProfile.phoneNumber,
+                                              runnerName:
+                                                  userProfile.displayName,
+                                              runnerPhone:
+                                                  userProfile.phoneNumber,
                                             );
 
-                                        locationService.startLocationTracking(task.id);
+                                        locationService.startLocationTracking(
+                                          task.id,
+                                        );
 
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(

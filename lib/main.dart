@@ -7,6 +7,7 @@ import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'core/config/app_mode.dart';
+import 'core/themes/theme_provider.dart';
 import 'presentation/screens/home/runner_home_screen.dart';
 
 FirebaseOptions? _firebaseOptionsFromEnv() {
@@ -49,7 +50,9 @@ void main() async {
   // 2. Initialize Firebase only when backend mode is enabled.
   if (AppMode.backendEnabled) {
     try {
-      final options = _needsExplicitOptions() ? _firebaseOptionsFromEnv() : null;
+      final options = _needsExplicitOptions()
+          ? _firebaseOptionsFromEnv()
+          : null;
       if (options == null && _needsExplicitOptions()) {
         throw Exception(
           'Missing Firebase options. Provide --dart-define values for web/windows.',
@@ -73,11 +76,13 @@ void main() async {
   runApp(const ProviderScope(child: CampusRunnerApp()));
 }
 
-class CampusRunnerApp extends StatelessWidget {
+class CampusRunnerApp extends ConsumerWidget {
   const CampusRunnerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Campus Runner',
@@ -93,7 +98,7 @@ class CampusRunnerApp extends StatelessWidget {
         textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
         useMaterial3: true,
       ),
-      themeMode: ThemeMode.system, // Auto-switch based on phone settings
+      themeMode: themeMode,
       // --- HOME SCREEN ---
       // Guest browsing by default.
       home: const RunnerHomeScreen(),
