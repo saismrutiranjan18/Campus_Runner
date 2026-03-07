@@ -6,6 +6,7 @@ import {
   allowedTransportModes,
   Task,
 } from "../models/task.model.js";
+import { evaluateTaskForFraudFlags } from "../services/fraudDetection.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -534,6 +535,7 @@ const completeTask = asyncHandler(async (req, res) => {
 
   await task.save();
   await task.populate(detailedTaskPopulateFields);
+  await evaluateTaskForFraudFlags(task, "completed");
 
   res
     .status(200)
@@ -555,6 +557,7 @@ const cancelTask = asyncHandler(async (req, res) => {
 
   await task.save();
   await task.populate(detailedTaskPopulateFields);
+  await evaluateTaskForFraudFlags(task, "cancelled");
 
   res
     .status(200)

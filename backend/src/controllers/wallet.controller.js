@@ -5,6 +5,7 @@ import {
   WalletTransaction,
   allowedWalletTransactionStatuses,
 } from "../models/walletTransaction.model.js";
+import { evaluateWalletTransactionForFraudFlags } from "../services/fraudDetection.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -305,6 +306,8 @@ const createCreditTransaction = asyncHandler(async (req, res) => {
     initiatedBy: req.user._id,
   });
 
+  await evaluateWalletTransactionForFraudFlags(transaction);
+
   res.status(201).json(
     new ApiResponse(
       201,
@@ -335,6 +338,8 @@ const createDebitTransaction = asyncHandler(async (req, res) => {
     status,
     initiatedBy: req.user._id,
   });
+
+  await evaluateWalletTransactionForFraudFlags(transaction);
 
   res.status(201).json(
     new ApiResponse(
@@ -377,6 +382,7 @@ const updateWalletTransactionStatus = asyncHandler(async (req, res) => {
 
   await transaction.save();
   await transaction.populate(walletPopulateFields);
+  await evaluateWalletTransactionForFraudFlags(transaction);
 
   res.status(200).json(
     new ApiResponse(
