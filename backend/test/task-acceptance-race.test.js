@@ -33,9 +33,7 @@ const createAccessToken = (user) =>
   );
 
 const createUser = async ({ fullName, email, role }) => {
-  const now = new Date();
-  const user = {
-    _id: new mongoose.Types.ObjectId(),
+  return User.create({
     fullName,
     email,
     password: "Password123!",
@@ -43,14 +41,9 @@ const createUser = async ({ fullName, email, role }) => {
     isVerified: true,
     isActive: true,
     phoneNumber: "",
-    refreshToken: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await User.collection.insertOne(user);
-
-  return user;
+    campusId: "",
+    campusName: "",
+  });
 };
 
 describe("task acceptance concurrency", () => {

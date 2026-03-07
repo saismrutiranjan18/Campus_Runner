@@ -1,4 +1,5 @@
 import { app } from "./app.js";
+import { startTaskExpiryMonitor } from "./background/taskExpiry.monitor.js";
 import connectDB from "./db/db.js";
 import { validateEnv } from "./utils/env.js";
 
@@ -8,6 +9,8 @@ validateEnv();
 
 connectDB()
 .then(() =>{
+    startTaskExpiryMonitor();
+
    app.on("error", (error) => {
       console.log("ERRR", error);
       throw error

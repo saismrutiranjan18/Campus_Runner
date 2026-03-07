@@ -71,6 +71,11 @@ const taskSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    assignmentExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     startedAt: {
       type: Date,
       default: null,
@@ -84,6 +89,24 @@ const taskSchema = new mongoose.Schema(
       default: null,
     },
     cancellationReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    lastExpiredAt: {
+      type: Date,
+      default: null,
+    },
+    reopenedAt: {
+      type: Date,
+      default: null,
+    },
+    expiryReopenCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    expirationReason: {
       type: String,
       trim: true,
       default: "",
@@ -114,6 +137,7 @@ const taskSchema = new mongoose.Schema(
 );
 
 taskSchema.index({ status: 1, createdAt: -1 });
+taskSchema.index({ status: 1, assignmentExpiresAt: 1, isArchived: 1 });
 taskSchema.index({ isArchived: 1, status: 1, createdAt: -1 });
 taskSchema.index({ campus: 1, status: 1, createdAt: -1 });
 taskSchema.index({ transportMode: 1, status: 1, createdAt: -1 });

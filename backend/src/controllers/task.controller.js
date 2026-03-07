@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
-import { allowedTaskStatuses, allowedTransportModes, Task } from "../models/task.model.js";
+import { calculateAssignmentExpiryDate } from "../background/taskExpiry.monitor.js";
+import {
+  allowedTaskStatuses,
+  allowedTransportModes,
+  Task,
+} from "../models/task.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -13,14 +18,24 @@ const taskTransitionMap = {
   cancelled: [],
 };
 
+const baseTaskUserSelection = "fullName email phoneNumber role isVerified isActive";
+
 const populateTaskFields = [
   {
     path: "requestedBy",
-    select: "fullName email phoneNumber role isVerified isActive",
+    select: baseTaskUserSelection,
   },
   {
     path: "assignedRunner",
-    select: "fullName email phoneNumber role isVerified isActive",
+    select: baseTaskUserSelection,
+  },
+];
+
+const detailedTaskPopulateFields = [
+  ...populateTaskFields,
+  {
+    path: "archivedBy",
+    select: baseTaskUserSelection,
   },
 ];
 
@@ -53,10 +68,15 @@ const sanitizeTask = (task) => ({
   requestedBy: sanitizeTaskUser(task.requestedBy),
   assignedRunner: sanitizeTaskUser(task.assignedRunner),
   acceptedAt: task.acceptedAt,
+  assignmentExpiresAt: task.assignmentExpiresAt,
   startedAt: task.startedAt,
   completedAt: task.completedAt,
   cancelledAt: task.cancelledAt,
   cancellationReason: task.cancellationReason,
+  lastExpiredAt: task.lastExpiredAt,
+  reopenedAt: task.reopenedAt,
+  expiryReopenCount: task.expiryReopenCount,
+  expirationReason: task.expirationReason,
   isArchived: task.isArchived,
   archivedAt: task.archivedAt,
   archiveReason: task.archiveReason,
@@ -68,6 +88,12 @@ const sanitizeTask = (task) => ({
 const ensureValidTaskId = (taskId) => {
   if (!mongoose.isValidObjectId(taskId)) {
     throw new ApiError(400, "Invalid task id provided");
+  }
+};
+
+const ensureTaskNotArchived = (task) => {
+  if (task.isArchived) {
+    throw new ApiError(409, "Archived tasks cannot be modified through lifecycle routes");
   }
 };
 
@@ -114,56 +140,64 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
     search,
     requestedBy,
     assignedRunner,
+    archived,
     page = 1,
     limit = 20,
     sort = "desc",
     cursor,
   } = query;
 
-  const filters = {};
+  const conditions = [];
+  const resolvedStatus = overrides.status ?? status;
+  const resolvedCampus = overrides.campus ?? campus;
+  const resolvedTransportMode = overrides.transportMode ?? transportMode;
+  const resolvedArchived =
+    overrides.isArchived ??
+    (archived === undefined ? false : String(archived).toLowerCase() === "true");
 
-  const resolvedStatus = overrides.status || status;
+  conditions.push({ isArchived: resolvedArchived });
+
   if (resolvedStatus) {
     if (!allowedTaskStatuses.includes(resolvedStatus)) {
       throw new ApiError(400, "Invalid task status filter");
     }
 
-    filters.status = resolvedStatus;
+    conditions.push({ status: resolvedStatus });
   }
 
-  const resolvedCampus = overrides.campus || campus;
-  if (resolvedCampus) {
-    filters.campus = resolvedCampus.trim();
+  if (resolvedCampus?.trim()) {
+    conditions.push({ campus: resolvedCampus.trim() });
   }
 
-  const resolvedTransportMode = overrides.transportMode || transportMode;
   if (resolvedTransportMode) {
     if (!allowedTransportModes.includes(resolvedTransportMode)) {
       throw new ApiError(400, "Invalid transport mode filter");
     }
 
-    filters.transportMode = resolvedTransportMode;
+    conditions.push({ transportMode: resolvedTransportMode });
   }
 
   if (requestedBy) {
     ensureValidTaskId(requestedBy);
-    filters.requestedBy = requestedBy;
+    conditions.push({ requestedBy });
   }
 
   if (assignedRunner) {
     ensureValidTaskId(assignedRunner);
-    filters.assignedRunner = assignedRunner;
+    conditions.push({ assignedRunner });
   }
 
   if (search?.trim()) {
     const pattern = new RegExp(escapeRegex(search.trim()), "i");
-    filters.$or = [
-      { title: pattern },
-      { description: pattern },
-      { pickupLocation: pattern },
-      { dropoffLocation: pattern },
-      { campus: pattern },
-    ];
+    conditions.push({
+      $or: [
+        { title: pattern },
+        { description: pattern },
+        { pickupLocation: pattern },
+        { dropoffLocation: pattern },
+        { campus: pattern },
+      ],
+    });
   }
 
   const resolvedSort = String(sort).toLowerCase() === "asc" ? 1 : -1;
@@ -172,32 +206,28 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
   const decodedCursor = cursor ? decodeCursor(cursor) : null;
 
   if (decodedCursor) {
-    filters.$or = [
-      {
-        createdAt: resolvedSort === -1 ? { $lt: decodedCursor.createdAt } : { $gt: decodedCursor.createdAt },
-      },
-      {
-        createdAt: decodedCursor.createdAt,
-        _id: resolvedSort === -1 ? { $lt: decodedCursor.id } : { $gt: decodedCursor.id },
-      },
-    ];
-
-    if (search?.trim()) {
-      const pattern = new RegExp(escapeRegex(search.trim()), "i");
-      filters.$and = [
+    conditions.push({
+      $or: [
         {
-          $or: [
-            { title: pattern },
-            { description: pattern },
-            { pickupLocation: pattern },
-            { dropoffLocation: pattern },
-            { campus: pattern },
-          ],
+          createdAt:
+            resolvedSort === -1
+              ? { $lt: decodedCursor.createdAt }
+              : { $gt: decodedCursor.createdAt },
         },
-        { $or: filters.$or },
-      ];
-      delete filters.$or;
-    }
+        {
+          createdAt: decodedCursor.createdAt,
+          _id:
+            resolvedSort === -1 ? { $lt: decodedCursor.id } : { $gt: decodedCursor.id },
+        },
+      ],
+    });
+  }
+
+  let filters = {};
+  if (conditions.length === 1) {
+    [filters] = conditions;
+  } else if (conditions.length > 1) {
+    filters = { $and: conditions };
   }
 
   return {
@@ -214,7 +244,9 @@ const fetchTaskFeed = async (query, overrides = {}) => {
     resolveTaskFeedQuery(query, overrides);
 
   const sortOrder = { createdAt: resolvedSort, _id: resolvedSort };
-  const baseQuery = Task.find(filters).populate(populateTaskFields).sort(sortOrder);
+  const baseQuery = Task.find(filters)
+    .populate(detailedTaskPopulateFields)
+    .sort(sortOrder);
 
   if (usesCursor) {
     const tasks = await baseQuery.limit(resolvedLimit + 1);
@@ -266,13 +298,7 @@ const assertTransitionAllowed = (task, nextStatus) => {
 const fetchTaskOrThrow = async (taskId) => {
   ensureValidTaskId(taskId);
 
-  const task = await Task.findById(taskId).populate([
-    ...populateTaskFields,
-    {
-      path: "archivedBy",
-      select: "fullName email phoneNumber role isVerified isActive",
-    },
-  ]);
+  const task = await Task.findById(taskId).populate(detailedTaskPopulateFields);
 
   if (!task) {
     throw new ApiError(404, "Task not found");
@@ -281,15 +307,11 @@ const fetchTaskOrThrow = async (taskId) => {
   return task;
 };
 
-const ensureTaskNotArchived = (task) => {
-  if (task.isArchived) {
-    throw new ApiError(409, "Archived tasks cannot be modified through lifecycle routes");
-  }
 const fetchTaskForAssignment = async (taskId) => {
   ensureValidTaskId(taskId);
 
   const task = await Task.findById(taskId).select(
-    "requestedBy assignedRunner status acceptedAt",
+    "requestedBy assignedRunner status acceptedAt assignmentExpiresAt isArchived",
   );
 
   if (!task) {
@@ -320,7 +342,15 @@ const ensureTaskRequesterOrAdmin = (task, user) => {
 };
 
 const createTask = asyncHandler(async (req, res) => {
-  const { title, description, pickupLocation, dropoffLocation, campus, transportMode, reward } = req.body;
+  const {
+    title,
+    description,
+    pickupLocation,
+    dropoffLocation,
+    campus,
+    transportMode,
+    reward,
+  } = req.body;
 
   if (!title || !description || !pickupLocation || !dropoffLocation) {
     throw new ApiError(
@@ -349,44 +379,36 @@ const createTask = asyncHandler(async (req, res) => {
     requestedBy: req.user._id,
   });
 
-  const createdTask = await Task.findById(task._id).populate(populateTaskFields);
+  const createdTask = await Task.findById(task._id).populate(detailedTaskPopulateFields);
 
   res
     .status(201)
     .json(new ApiResponse(201, sanitizeTask(createdTask), "Task created successfully"));
 });
 
-const listOpenTasks = asyncHandler(async (_, res) => {
-  const tasks = await Task.find({ status: "open", isArchived: false })
-    .populate([
-      ...populateTaskFields,
-      {
-        path: "archivedBy",
-        select: "fullName email phoneNumber role isVerified isActive",
-      },
-    ])
-    .sort({ createdAt: -1 });
 const listOpenTasks = asyncHandler(async (req, res) => {
-  const { items, pagination } = await fetchTaskFeed(req.query, { status: "open" });
+  const { items, pagination } = await fetchTaskFeed(req.query, {
+    status: "open",
+    isArchived: false,
+  });
 
-  res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        {
-          items: items.map(sanitizeTask),
-          pagination,
-          filters: {
-            search: req.query.search || "",
-            campus: req.query.campus || "",
-            status: "open",
-            transportMode: req.query.transportMode || "",
-          },
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: items.map(sanitizeTask),
+        pagination,
+        filters: {
+          search: req.query.search || "",
+          campus: req.query.campus || "",
+          status: "open",
+          transportMode: req.query.transportMode || "",
+          archived: false,
         },
-        "Open tasks fetched successfully",
-      ),
-    );
+      },
+      "Open tasks fetched successfully",
+    ),
+  );
 });
 
 const listTasks = asyncHandler(async (req, res) => {
@@ -403,6 +425,10 @@ const listTasks = asyncHandler(async (req, res) => {
           campus: req.query.campus || "",
           status: req.query.status || "",
           transportMode: req.query.transportMode || "",
+          archived:
+            req.query.archived === undefined
+              ? false
+              : String(req.query.archived).toLowerCase() === "true",
         },
       },
       "Tasks fetched successfully",
@@ -422,8 +448,8 @@ const acceptTask = asyncHandler(async (req, res) => {
   const taskId = req.params.taskId;
   const existingTask = await fetchTaskForAssignment(taskId);
 
-  ensureTaskNotArchived(task);
-  assertTransitionAllowed(task, "accepted");
+  ensureTaskNotArchived(existingTask);
+
   if (String(existingTask.requestedBy) === String(req.user._id)) {
     throw new ApiError(403, "Requesters cannot accept their own task");
   }
@@ -440,6 +466,7 @@ const acceptTask = asyncHandler(async (req, res) => {
   }
 
   const acceptedAt = new Date();
+  const assignmentExpiresAt = calculateAssignmentExpiryDate(acceptedAt);
 
   const task = await Task.findOneAndUpdate(
     {
@@ -447,12 +474,14 @@ const acceptTask = asyncHandler(async (req, res) => {
       requestedBy: { $ne: req.user._id },
       assignedRunner: null,
       status: "open",
+      isArchived: false,
     },
     {
       $set: {
         status: "accepted",
         assignedRunner: req.user._id,
         acceptedAt,
+        assignmentExpiresAt,
         startedAt: null,
         completedAt: null,
         cancelledAt: null,
@@ -462,7 +491,7 @@ const acceptTask = asyncHandler(async (req, res) => {
     {
       returnDocument: "after",
     },
-  ).populate(populateTaskFields);
+  ).populate(detailedTaskPopulateFields);
 
   if (!task) {
     throw new ApiError(409, "Task acceptance failed because it was already taken");
@@ -482,9 +511,10 @@ const markTaskInProgress = asyncHandler(async (req, res) => {
 
   task.status = "in_progress";
   task.startedAt = new Date();
+  task.assignmentExpiresAt = null;
 
   await task.save();
-  await task.populate(populateTaskFields);
+  await task.populate(detailedTaskPopulateFields);
 
   res.status(200).json(
     new ApiResponse(200, sanitizeTask(task), "Task marked as in progress successfully"),
@@ -500,9 +530,10 @@ const completeTask = asyncHandler(async (req, res) => {
 
   task.status = "completed";
   task.completedAt = new Date();
+  task.assignmentExpiresAt = null;
 
   await task.save();
-  await task.populate(populateTaskFields);
+  await task.populate(detailedTaskPopulateFields);
 
   res
     .status(200)
@@ -520,9 +551,10 @@ const cancelTask = asyncHandler(async (req, res) => {
   task.status = "cancelled";
   task.cancelledAt = new Date();
   task.cancellationReason = cancellationReason?.trim() || "Cancelled by requester";
+  task.assignmentExpiresAt = null;
 
   await task.save();
-  await task.populate(populateTaskFields);
+  await task.populate(detailedTaskPopulateFields);
 
   res
     .status(200)
@@ -534,9 +566,15 @@ const listProtectedTaskActions = asyncHandler(async (req, res) => {
     req.user.role === "requester"
       ? ["create-task", "list-open-tasks", "cancel-own-task"]
       : req.user.role === "runner"
-        ? ["list-open-tasks", "accept-task", "mark-task-in-progress", "complete-task"]
+        ? [
+            "list-open-tasks",
+            "accept-task",
+            "mark-task-in-progress",
+            "complete-task",
+          ]
         : [
             "create-task",
+            "list-all-tasks",
             "list-open-tasks",
             "accept-task",
             "mark-task-in-progress",

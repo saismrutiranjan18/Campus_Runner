@@ -69,6 +69,9 @@ const taskSchema = {
     acceptedAt: {
       anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
     },
+    assignmentExpiresAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
     startedAt: {
       anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
     },
@@ -79,6 +82,17 @@ const taskSchema = {
       anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
     },
     cancellationReason: { type: "string", example: "Requester no longer needs the task" },
+    lastExpiredAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    reopenedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    expiryReopenCount: { type: "integer", example: 1 },
+    expirationReason: {
+      type: "string",
+      example: "Task acceptance expired after 900000ms",
+    },
     createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", format: "date-time" },
   },
@@ -172,8 +186,7 @@ const swaggerDocument = {
     title: "Campus Runner Backend API",
     version: "1.0.0",
     description:
-      "JWT authentication, role-based authorization, profile, task, wallet, and admin moderation APIs for Campus Runner.",
-      "JWT authentication, role-based authorization, profile APIs, task lifecycle APIs, and wallet APIs for Campus Runner.",
+      "JWT authentication, role-based authorization, profile, task, wallet, admin moderation, and background task expiry APIs for Campus Runner.",
   },
   servers: [
     {
@@ -1012,21 +1025,11 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "Task accepted successfully",
-          },
-        },
-      },
-    },
-    "/api/v1/tasks/{taskId}/in-progress": {
-      patch: {
-        tags: ["Tasks"],
-        summary: "Mark an accepted task as in progress",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "path",
-            name: "taskId",
-            required: true,
-            schema: { type: "string" },
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
           },
           403: {
             description: "Requester cannot accept their own task",
@@ -1348,7 +1351,6 @@ const swaggerDocument = {
           {
             in: "path",
             name: "reportId",
-            name: "transactionId",
             required: true,
             schema: { type: "string" },
           },
@@ -1358,7 +1360,6 @@ const swaggerDocument = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/UpdateReportStatusRequest" },
-              schema: { $ref: "#/components/schemas/UpdateWalletTransactionStatusRequest" },
             },
           },
         },
@@ -1370,7 +1371,6 @@ const swaggerDocument = {
                 schema: { $ref: "#/components/schemas/ReportResponse" },
               },
             },
-            description: "Wallet transaction status updated successfully",
           },
         },
       },
