@@ -32,6 +32,7 @@ class RunnerHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
+  String sortType = "latest";
   bool _isLoggedIn() {
     if (!AppMode.backendEnabled) return true;
     return ref.read(authRepositoryProvider).getCurrentUser() != null;
@@ -48,7 +49,6 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
-
     return result == true;
   }
 
@@ -226,8 +226,34 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
               error: (error, _) => Text('Error: $error'),
             ),
           ),
-          Expanded(
-            child: tasksAsync.when(
+          // FILTER + SORT BUTTONS
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.filter_list),
+                  label: const Text("Filter"),
+                ),
+                ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    sortType = sortType == "highest_price"
+                        ? "latest"
+                        : "highest_price";
+                  });
+                },
+                icon: const Icon(Icons.sort),
+                label: const Text("Sort"),
+              ),
+              ],
+            ),
+          ),
+
+            Expanded(
+              child: tasksAsync.when(
               // A. LOADING STATE
               loading: () => Skeletonizer(
                 enabled: true,
@@ -253,7 +279,14 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
 
               // C. DATA STATE
               data: (tasks) {
-                if (tasks.isEmpty) {
+                final sortedTasks = [...tasks];
+                if (sortType == "highest_price") {
+                sortedTasks.sort((a, b) => b.price.compareTo(a.price));
+              } else if (sortType == "latest") {
+                sortedTasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              }
+
+             if (sortedTasks.isEmpty){
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -276,9 +309,9 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                 // Show the list of tasks
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: tasks.length,
+                  itemCount: sortedTasks.length,
                   itemBuilder: (context, index) {
-                    final task = tasks[index];
+                    final task = sortedTasks[index];
 
                     // We use a Column to stack the card and the action button
                     return Column(
