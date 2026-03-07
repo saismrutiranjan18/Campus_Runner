@@ -288,7 +288,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 - [ ] iOS push notifications occasionally delayed
 - [ ] Map rendering slow on older devices
-- [ ] Chat images take time to load on slow networks
+- [x] Chat images take time to load on slow networks
 
 See the [Issues](https://github.com/saismrutiranjan18/Campus_Runner/issues) page for a full list.
 
