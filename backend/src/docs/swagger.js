@@ -25,6 +25,45 @@ const userSchema = {
   },
 };
 
+const taskSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string", example: "67ca72d999ea40f2abc98765" },
+    title: { type: "string", example: "Pick up lab printouts" },
+    description: {
+      type: "string",
+      example: "Collect the printed assignment from Block A and deliver it to Hostel 3.",
+    },
+    pickupLocation: { type: "string", example: "Academic Block A" },
+    dropoffLocation: { type: "string", example: "Hostel 3 Reception" },
+    reward: { type: "number", example: 80 },
+    status: {
+      type: "string",
+      enum: ["open", "accepted", "in_progress", "completed", "cancelled"],
+      example: "open",
+    },
+    requestedBy: { $ref: "#/components/schemas/User" },
+    assignedRunner: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
+    acceptedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    startedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    completedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    cancelledAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    cancellationReason: { type: "string", example: "Requester no longer needs the task" },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+};
+
 const apiResponse = (dataSchema, messageExample = "Success") => ({
   type: "object",
   properties: {
@@ -41,7 +80,7 @@ const swaggerDocument = {
     title: "Campus Runner Backend API",
     version: "1.0.0",
     description:
-      "JWT authentication, role-based authorization, profile APIs, and protected task placeholder routes for Campus Runner.",
+      "JWT authentication, role-based authorization, profile APIs, and task lifecycle APIs for Campus Runner.",
   },
   servers: [
     {
@@ -136,6 +175,41 @@ const swaggerDocument = {
           },
         },
       },
+      Task: taskSchema,
+      CreateTaskRequest: {
+        type: "object",
+        required: ["title", "description", "pickupLocation", "dropoffLocation"],
+        properties: {
+          title: { type: "string", example: "Pick up lab printouts" },
+          description: {
+            type: "string",
+            example: "Collect the printed assignment from Block A and deliver it to Hostel 3.",
+          },
+          pickupLocation: { type: "string", example: "Academic Block A" },
+          dropoffLocation: { type: "string", example: "Hostel 3 Reception" },
+          reward: { type: "number", example: 80 },
+        },
+      },
+      CancelTaskRequest: {
+        type: "object",
+        properties: {
+          cancellationReason: {
+            type: "string",
+            example: "Requester no longer needs the item delivered",
+          },
+        },
+      },
+      TaskResponse: apiResponse(
+        { $ref: "#/components/schemas/Task" },
+        "Task fetched successfully",
+      ),
+      TaskListResponse: apiResponse(
+        {
+          type: "array",
+          items: { $ref: "#/components/schemas/Task" },
+        },
+        "Open tasks fetched successfully",
+      ),
     },
   },
   paths: {
@@ -365,15 +439,44 @@ const swaggerDocument = {
         },
       },
     },
+    "/api/v1/tasks/open": {
+      get: {
+        tags: ["Tasks"],
+        summary: "List all open tasks",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Open tasks fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskListResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/v1/tasks": {
       post: {
         tags: ["Tasks"],
-        summary: "Create task placeholder",
-        description: "Protected route for requester/admin until full task service is implemented.",
+        summary: "Create a new task",
         security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateTaskRequest" },
+            },
+          },
+        },
         responses: {
           201: {
-            description: "Task creation route is protected and ready",
+            description: "Task created successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
           },
           403: {
             description: "Requester/admin only route",
@@ -381,11 +484,10 @@ const swaggerDocument = {
         },
       },
     },
-    "/api/v1/tasks/{taskId}/accept": {
-      patch: {
+    "/api/v1/tasks/{taskId}": {
+      get: {
         tags: ["Tasks"],
-        summary: "Accept task placeholder",
-        description: "Protected route for runner/admin until full task assignment logic is implemented.",
+        summary: "Get task by id",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -397,10 +499,141 @@ const swaggerDocument = {
         ],
         responses: {
           200: {
-            description: "Task acceptance route is protected and ready",
+            description: "Task fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
+          },
+          404: {
+            description: "Task not found",
+          },
+        },
+      },
+    },
+    "/api/v1/tasks/{taskId}/accept": {
+      patch: {
+        tags: ["Tasks"],
+        summary: "Accept an open task",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Task accepted successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
+          },
+          409: {
+            description: "Illegal task transition",
           },
           403: {
             description: "Runner/admin only route",
+          },
+        },
+      },
+    },
+    "/api/v1/tasks/{taskId}/in-progress": {
+      patch: {
+        tags: ["Tasks"],
+        summary: "Mark an accepted task as in progress",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Task marked as in progress successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
+          },
+          409: {
+            description: "Illegal task transition",
+          },
+        },
+      },
+    },
+    "/api/v1/tasks/{taskId}/complete": {
+      patch: {
+        tags: ["Tasks"],
+        summary: "Complete an in-progress task",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Task completed successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
+          },
+          409: {
+            description: "Illegal task transition",
+          },
+        },
+      },
+    },
+    "/api/v1/tasks/{taskId}/cancel": {
+      patch: {
+        tags: ["Tasks"],
+        summary: "Cancel a task",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CancelTaskRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Task cancelled successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Requester/admin only route",
+          },
+          409: {
+            description: "Illegal task transition",
           },
         },
       },
