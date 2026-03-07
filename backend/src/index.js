@@ -1,7 +1,10 @@
 import { app } from "./app.js";
 import connectDB from "./db/db.js";
+import { validateEnv } from "./utils/env.js";
+
 const PORT = process.env.PORT;
 
+validateEnv();
 
 connectDB()
 .then(() =>{
@@ -15,7 +18,7 @@ connectDB()
     });
 })
 .catch((err) => {
-    console.Console.log("MongoDB Connection failed !!!", err)
+    console.log("MongoDB Connection failed !!!", err)
 })
   
  
