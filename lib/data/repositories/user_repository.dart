@@ -90,4 +90,17 @@ class UserRepository {
     final doc = await _firestore.collection('users').doc(userId).get();
     return doc.exists;
   }
+  Stream<List<UserModel>> getAllUsersStream() {
+  if (!AppMode.backendEnabled) {
+    return Stream.value([]);
+  }
+
+  return _firestore
+      .collection('users')
+      .snapshots()
+      .map((snapshot) {
+    return snapshot.docs
+        .map((doc) => UserModel.fromMap(doc.data(), doc.id))
+        .toList();
+  });
 }

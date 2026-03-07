@@ -26,3 +26,12 @@ final userProfileProvider = StreamProvider.family<UserModel?, String>((
 ) {
   return ref.watch(userRepositoryProvider).getUserProfileStream(userId);
 });
+
+final leaderboardProvider = StreamProvider<List<UserModel>>((ref) {
+  final repo = ref.watch(userRepositoryProvider);
+
+  return repo.getAllUsersStream().map((users) {
+    users.sort((a, b) => (b.completedTasks ?? 0).compareTo(a.completedTasks ?? 0));
+    return users;
+  });
+});
