@@ -216,6 +216,41 @@ class ProfileScreen extends ConsumerWidget {
                     .fade(delay: 120.ms, duration: 320.ms)
                     .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
+                    Text(
+                      'Runner Performance',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: PhosphorIcons.clock(),
+                          title: 'Active',
+                          value: '0',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _StatCard(
+                          icon: PhosphorIcons.xCircle(),
+                          title: 'Cancelled',
+                          value: '0',
+                        ),
+                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.currencyDollar(),
+                            title: 'Earnings',
+                            value: '\$${userProfile?.totalEarnings ?? 0}',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     if (userProfile != null && !userProfile.isVerified)
                       _ActionTile(
                         icon: PhosphorIcons.shieldCheck(),
