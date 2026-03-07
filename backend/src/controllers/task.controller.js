@@ -88,6 +88,20 @@ const fetchTaskOrThrow = async (taskId) => {
   return task;
 };
 
+const fetchTaskForAssignment = async (taskId) => {
+  ensureValidTaskId(taskId);
+
+  const task = await Task.findById(taskId).select(
+    "requestedBy assignedRunner status acceptedAt",
+  );
+
+  if (!task) {
+    throw new ApiError(404, "Task not found");
+  }
+
+  return task;
+};
+
 const ensureAssignedRunner = (task, user) => {
   if (user.role === "admin") {
     return;
@@ -158,20 +172,52 @@ const getTaskById = asyncHandler(async (req, res) => {
 });
 
 const acceptTask = asyncHandler(async (req, res) => {
-  const task = await fetchTaskOrThrow(req.params.taskId);
+  const taskId = req.params.taskId;
+  const existingTask = await fetchTaskForAssignment(taskId);
 
-  assertTransitionAllowed(task, "accepted");
+  if (String(existingTask.requestedBy) === String(req.user._id)) {
+    throw new ApiError(403, "Requesters cannot accept their own task");
+  }
 
-  task.status = "accepted";
-  task.assignedRunner = req.user._id;
-  task.acceptedAt = new Date();
-  task.startedAt = null;
-  task.completedAt = null;
-  task.cancelledAt = null;
-  task.cancellationReason = "";
+  if (existingTask.assignedRunner) {
+    throw new ApiError(409, "Task has already been accepted by another runner");
+  }
 
-  await task.save();
-  await task.populate(populateTaskFields);
+  if (existingTask.status !== "open") {
+    throw new ApiError(
+      409,
+      `Only open tasks can be accepted. Current status: ${existingTask.status}`,
+    );
+  }
+
+  const acceptedAt = new Date();
+
+  const task = await Task.findOneAndUpdate(
+    {
+      _id: taskId,
+      requestedBy: { $ne: req.user._id },
+      assignedRunner: null,
+      status: "open",
+    },
+    {
+      $set: {
+        status: "accepted",
+        assignedRunner: req.user._id,
+        acceptedAt,
+        startedAt: null,
+        completedAt: null,
+        cancelledAt: null,
+        cancellationReason: "",
+      },
+    },
+    {
+      returnDocument: "after",
+    },
+  ).populate(populateTaskFields);
+
+  if (!task) {
+    throw new ApiError(409, "Task acceptance failed because it was already taken");
+  }
 
   res
     .status(200)
