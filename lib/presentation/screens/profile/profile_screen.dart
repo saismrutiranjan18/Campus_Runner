@@ -3,13 +3,17 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../../core/config/app_mode.dart';
 import '../../../logic/auth_provider.dart';
 import '../../../logic/user_provider.dart';
 import '../../../data/models/user_model.dart';
 import '../auth/login_screen.dart';
+import '../../widgets/loaders/aurora_loader.dart';
 import 'edit_profile_screen.dart';
 import '../auth/phone_verification_screen.dart';
+import 'wallet_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -52,18 +56,23 @@ class ProfileScreen extends ConsumerWidget {
     return userProfileAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const FullScreenAuroraLoader(
+          label: 'Loading profile',
+          subtitle: 'Preparing your runner dashboard',
+        ),
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
         body: Center(child: Text('Error: $error')),
       ),
       data: (userProfile) {
-        final displayName = userProfile?.displayName ?? 
+        final displayName =
+            userProfile?.displayName ??
             (user?.displayName?.trim().isNotEmpty == true
                 ? user!.displayName!
                 : 'Campus Runner');
-        final email = userProfile?.email ?? 
+        final email =
+            userProfile?.email ??
             (user?.email ?? (isDemo ? 'demo@campusrunner.app' : 'Guest user'));
         final initials = displayName
             .split(' ')
@@ -110,9 +119,14 @@ class ProfileScreen extends ConsumerWidget {
                             radius: 34,
                             backgroundColor: colors.primaryContainer,
                             backgroundImage: userProfile?.photoUrl != null
-                                ? NetworkImage(userProfile!.photoUrl!)
+                                ? CachedNetworkImageProvider(userProfile!.photoUrl!)
                                 : (user?.photoURL != null
-                                    ? NetworkImage(user!.photoURL!)
+                                      ? NetworkImage(user!.photoURL!)
+                                      : null),
+                            child:
+                                userProfile?.photoUrl == null &&
+                                    user?.photoURL == null
+                                    ? CachedNetworkImageProvider(user!.photoURL!)
                                     : null),
                             child: userProfile?.photoUrl == null && user?.photoURL == null
                                 ? Text(
@@ -149,15 +163,17 @@ class ProfileScreen extends ConsumerWidget {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: colors.tertiaryContainer.withValues(alpha: 0.7),
+                                    color: colors.tertiaryContainer.withValues(
+                                      alpha: 0.7,
+                                    ),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
                                     userProfile == null
                                         ? 'Guest Mode'
                                         : (userProfile.isVerified
-                                            ? 'Verified ${_getRoleLabel(userProfile.role)}'
-                                            : 'Unverified'),
+                                              ? 'Verified ${_getRoleLabel(userProfile.role)}'
+                                              : 'Unverified'),
                                     style: theme.textTheme.labelLarge?.copyWith(
                                       color: colors.onTertiaryContainer,
                                     ),
@@ -171,11 +187,50 @@ class ProfileScreen extends ConsumerWidget {
                     ).animate().fade(duration: 300.ms).slideY(begin: 0.08, end: 0),
                     const SizedBox(height: 16),
                     Row(
+                          children: [
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.checkCircle(),
+                                title: 'Completed',
+                                value: '${userProfile?.completedTasks ?? 0}',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.star(),
+                                title: 'Rating',
+                                value:
+                                    userProfile?.rating.toStringAsFixed(1) ??
+                                    '0.0',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.users(),
+                                title: 'Reviews',
+                                value: '${userProfile?.totalRatings ?? 0}',
+                              ),
+                            ),
+                          ],
+                        )
+                        .animate()
+                        .fade(delay: 120.ms, duration: 320.ms)
+                        .slideY(begin: 0.1, end: 0),
                       children: [
                         Expanded(
                           child: _StatCard(
                             icon: PhosphorIcons.checkCircle(),
                             title: 'Completed',
+                            value: '${userProfile?.completedTasks ?? 0}',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.personSimpleRun(),
+                            title: 'Total Runs',
                             value: '${userProfile?.completedTasks ?? 0}',
                           ),
                         ),
@@ -197,10 +252,45 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                       ],
                     )
-                        .animate()
-                        .fade(delay: 120.ms, duration: 320.ms)
-                        .slideY(begin: 0.1, end: 0),
+                    .animate()
+                    .fade(delay: 120.ms, duration: 320.ms)
+                    .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
+                    Text(
+                      'Runner Performance',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: PhosphorIcons.clock(),
+                          title: 'Active',
+                          value: '0',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _StatCard(
+                          icon: PhosphorIcons.xCircle(),
+                          title: 'Cancelled',
+                          value: '0',
+                        ),
+                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.currencyDollar(),
+                            title: 'Earnings',
+                            value: '\$${userProfile?.totalEarnings ?? 0}',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     if (userProfile != null && !userProfile.isVerified)
                       _ActionTile(
                         icon: PhosphorIcons.shieldCheck(),
@@ -235,19 +325,36 @@ class ProfileScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => EditProfileScreen(userProfile: userProfile),
+                              builder: (_) =>
+                                  EditProfileScreen(userProfile: userProfile),
                             ),
                           );
                         },
                       ),
                     if (userProfile != null) const SizedBox(height: 10),
                     _ActionTile(
+                      icon: PhosphorIcons.wallet(),
+                      title: 'Wallet',
+                      subtitle: 'Check balance and recent transactions',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WalletScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _ActionTile(
                       icon: PhosphorIcons.mapTrifold(),
                       title: 'Saved routes',
                       subtitle: 'Manage your frequently used paths',
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Saved routes coming soon')),
+                          const SnackBar(
+                            content: Text('Saved routes coming soon'),
+                          ),
                         );
                       },
                     ),
@@ -323,7 +430,9 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: colors.surface.withValues(alpha: 0.7),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         children: [
@@ -376,7 +485,9 @@ class _ActionTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: colors.surface.withValues(alpha: 0.68),
-            border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.28)),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.28),
+            ),
           ),
           child: Row(
             children: [

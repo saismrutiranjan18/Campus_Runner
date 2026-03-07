@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart'; // <<<--- MISSING IMPORT ADDED HERE
@@ -146,9 +147,9 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
       setState(() => _selectedTransportMode = transport);
     }
 
-    final priceMatch = RegExp(r'(price|tip|amount)\s+(\d+)').firstMatch(
-      normalized,
-    );
+    final priceMatch = RegExp(
+      r'(price|tip|amount)\s+(\d+)',
+    ).firstMatch(normalized);
     if (priceMatch != null) {
       _priceController.text = priceMatch.group(2) ?? _priceController.text;
     }
@@ -301,11 +302,17 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final campusesAsync = ref.watch(campusesStreamProvider);
 
     return Scaffold(
+      backgroundColor: colors.surface,
       appBar: AppBar(
         title: const Text("Request a Runner"),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(PhosphorIcons.x()),
           onPressed: () => Navigator.pop(context),
@@ -315,9 +322,7 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const MyTasksScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const MyTasksScreen()),
               );
             },
             icon: Icon(PhosphorIcons.listChecks()),
@@ -325,253 +330,672 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
           ),
           IconButton(
             onPressed: _toggleListening,
-            icon: Icon(
-              _isListening ? Icons.mic_off : Icons.mic,
-            ),
+            icon: Icon(_isListening ? Icons.mic_off : Icons.mic),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isListening ? Icons.hearing : Icons.mic_none,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isListening
-                                ? 'Listening...'
-                                : 'Voice commands available',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _lastTranscript.isEmpty
-                                ? 'Say: pickup Admin Block, drop Girls Hostel C, item print notes, price 40'
-                                : _lastTranscript,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _toggleListening,
-                      icon: Icon(_isListening ? Icons.stop : Icons.mic),
-                    ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colors.primaryContainer.withValues(alpha: 0.24),
+                    colors.secondaryContainer.withValues(alpha: 0.18),
+                    colors.tertiaryContainer.withValues(alpha: 0.16),
+                    colors.surface,
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              _buildSectionTitle("Select Campus"),
-              const SizedBox(height: 12),
-              campusesAsync.when(
-                data: (campuses) {
-                  if (campuses.isEmpty) {
-                    return const Text("No campuses available.");
-                  }
-
-                  _selectedCampusId ??= campuses.first.id;
-                  _selectedCampusName ??= campuses.first.name;
-
-                  return DropdownButtonFormField<String>(
-                    initialValue: _selectedCampusId,
-                    decoration: _inputDecoration(
-                      "Campus",
-                      PhosphorIcons.buildings(),
-                    ),
-                    items: campuses.map((campus) {
-                      return DropdownMenuItem(
-                        value: campus.id,
-                        child: Text(campus.name),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      final selected = campuses.firstWhere(
-                        (campus) => campus.id == val,
-                        orElse: () => campuses.first,
-                      );
-                      setState(() {
-                        _selectedCampusId = selected.id;
-                        _selectedCampusName = selected.name;
-                      });
-                    },
-                    validator: (val) =>
-                        AppValidators.validateRequired(val, "Campus"),
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-                error: (error, _) => Text("Error: $error"),
-              ),
-
-              const SizedBox(height: 24),
-              // --- LOCATION DROPDOWNS ---
-              _buildSectionTitle("Where to go?"),
-              const SizedBox(height: 12),
-
-              DropdownButtonFormField<String>(
-                initialValue: _selectedPickup,
-                decoration: _inputDecoration(
-                  "Pickup Location",
-                  PhosphorIcons.storefront(),
-                ),
-                items: AppConstants.pickupZones.map((zone) {
-                  return DropdownMenuItem(value: zone, child: Text(zone));
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedPickup = val),
-                validator: (val) =>
-                    AppValidators.validateRequired(val, "Pickup"),
-              ),
-
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedDrop,
-                decoration: _inputDecoration(
-                  "Drop Location",
-                  PhosphorIcons.mapPin(),
-                ),
-                items: AppConstants.dropZones.map((zone) {
-                  return DropdownMenuItem(value: zone, child: Text(zone));
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedDrop = val),
-                validator: (val) =>
-                    AppValidators.validateRequired(val, "Drop location"),
-              ),
-
-              // --- END LOCATION DROPDOWNS ---
-              const SizedBox(height: 24),
-              _buildSectionTitle("Transport Mode"),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTransportMode,
-                decoration: _inputDecoration(
-                  "Select mode",
-                  PhosphorIcons.personSimpleWalk(),
-                ),
-                items: AppConstants.transportModes.map((mode) {
-                  return DropdownMenuItem(value: mode, child: Text(mode));
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedTransportMode = val),
-                validator: (val) =>
-                    AppValidators.validateRequired(val, "Transport mode"),
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionTitle("What do you need?"),
-              const SizedBox(height: 12),
-
-              // ITEM NAME
-              TextFormField(
-                controller: _itemController,
-                decoration: _inputDecoration(
-                  "e.g. Printing a 10-page doc",
-                  PhosphorIcons.shoppingBag(),
-                ),
-                validator: (val) =>
-                    AppValidators.validateRequired(val, "Item name"),
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionTitle("Upload Document (PDF only)"),
-              const SizedBox(height: 12),
-
-              // --- FILE PICKER UI ---
-              OutlinedButton.icon(
-                icon: Icon(PhosphorIcons.filePdf()),
-                label: Text(_fileName ?? "Select PDF File..."),
-                onPressed: _pickFile,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  side: BorderSide(
-                    color: _selectedFile != null ? Colors.green : Colors.grey,
-                  ),
-                ),
-              ),
-              if (_selectedFile != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    "File Ready: $_fileName",
-                    style: const TextStyle(color: Colors.green, fontSize: 13),
-                  ),
-                ),
-
-              // --- END FILE PICKER UI ---
-              const SizedBox(height: 24),
-              _buildSectionTitle("Runner Fee (Tip)"),
-              const SizedBox(height: 12),
-
-              // PRICE INPUT
-              TextFormField(
-                controller: _priceController,
-                keyboardType: TextInputType.number,
-                decoration: _inputDecoration(
-                  "₹20",
-                  PhosphorIcons.currencyInr(),
-                ),
-                validator: AppValidators.validatePrice,
-              ),
-
-              const SizedBox(height: 8),
-              Text(
-                "Suggested: ₹20 for nearby, ₹40 for far hostels.",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-
-              const SizedBox(height: 40),
-
-              // SUBMIT BUTTON
-              PrimaryButton(
-                text: "Post Task",
-                isLoading: _isUploading,
-                onPressed: _postTask,
-              ),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            top: -70,
+            right: -40,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.primary.withValues(alpha: 0.1),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -60,
+            bottom: 120,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.tertiary.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeroCard(context)
+                      .animate()
+                      .fade(duration: 320.ms)
+                      .slideY(begin: 0.08, end: 0),
+                  const SizedBox(height: 18),
+                  _buildFormSection(
+                    context,
+                    title: 'Campus & route',
+                    subtitle:
+                        'Pick the campus and where the runner needs to go.',
+                    icon: PhosphorIcons.mapTrifold(),
+                    child: Column(
+                      children: [
+                        campusesAsync.when(
+                          data: (campuses) {
+                            if (campuses.isEmpty) {
+                              return const Text('No campuses available.');
+                            }
+
+                            _selectedCampusId ??= campuses.first.id;
+                            _selectedCampusName ??= campuses.first.name;
+
+                            return DropdownButtonFormField<String>(
+                              initialValue: _selectedCampusId,
+                              decoration: _inputDecoration(
+                                'Campus',
+                                PhosphorIcons.buildings(),
+                              ),
+                              borderRadius: BorderRadius.circular(18),
+                              items: campuses.map((campus) {
+                                return DropdownMenuItem(
+                                  value: campus.id,
+                                  child: Text(campus.name),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                final selected = campuses.firstWhere(
+                                  (campus) => campus.id == val,
+                                  orElse: () => campuses.first,
+                                );
+                                setState(() {
+                                  _selectedCampusId = selected.id;
+                                  _selectedCampusName = selected.name;
+                                });
+                              },
+                              validator: (val) =>
+                                  AppValidators.validateRequired(val, 'Campus'),
+                            );
+                          },
+                          loading: () => const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                          error: (error, _) => Text('Error: $error'),
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedPickup,
+                          decoration: _inputDecoration(
+                            'Pickup location',
+                            PhosphorIcons.storefront(),
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          items: AppConstants.pickupZones.map((zone) {
+                            return DropdownMenuItem(
+                              value: zone,
+                              child: Text(zone),
+                            );
+                          }).toList(),
+                          onChanged: (val) =>
+                              setState(() => _selectedPickup = val),
+                          validator: (val) =>
+                              AppValidators.validateRequired(val, 'Pickup'),
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedDrop,
+                          decoration: _inputDecoration(
+                            'Drop location',
+                            PhosphorIcons.mapPin(),
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          items: AppConstants.dropZones.map((zone) {
+                            return DropdownMenuItem(
+                              value: zone,
+                              child: Text(zone),
+                            );
+                          }).toList(),
+                          onChanged: (val) =>
+                              setState(() => _selectedDrop = val),
+                          validator: (val) => AppValidators.validateRequired(
+                            val,
+                            'Drop location',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fade(delay: 80.ms).slideY(begin: 0.06, end: 0),
+                  const SizedBox(height: 16),
+                  _buildFormSection(
+                    context,
+                    title: 'Task details',
+                    subtitle:
+                        'Describe the work clearly so runners can accept faster.',
+                    icon: PhosphorIcons.notePencil(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: _itemController,
+                          maxLines: 2,
+                          decoration: _inputDecoration(
+                            'e.g. Print my assignment notes and deliver to hostel',
+                            PhosphorIcons.shoppingBag(),
+                          ),
+                          validator: (val) =>
+                              AppValidators.validateRequired(val, 'Item name'),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Transport mode',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: AppConstants.transportModes.map((mode) {
+                            final selected = _selectedTransportMode == mode;
+                            return ChoiceChip(
+                              label: Text(mode),
+                              selected: selected,
+                              avatar: Icon(
+                                _transportIcon(mode),
+                                size: 18,
+                                color: selected
+                                    ? colors.onPrimaryContainer
+                                    : colors.onSurfaceVariant,
+                              ),
+                              onSelected: (_) {
+                                setState(() => _selectedTransportMode = mode);
+                              },
+                              selectedColor: colors.primaryContainer,
+                              backgroundColor: colors.surfaceContainerHighest
+                                  .withValues(alpha: 0.55),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              side: BorderSide(
+                                color: selected
+                                    ? colors.primary.withValues(alpha: 0.35)
+                                    : colors.outlineVariant.withValues(
+                                        alpha: 0.25,
+                                      ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        if (_selectedTransportMode == null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              'Choose a transport mode to continue.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.error,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ).animate().fade(delay: 140.ms).slideY(begin: 0.06, end: 0),
+                  const SizedBox(height: 16),
+                  _buildFormSection(
+                    context,
+                    title: 'Document & fee',
+                    subtitle: 'Attach the file and set a fair runner tip.',
+                    icon: PhosphorIcons.fileArrowUp(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: _pickFile,
+                          child: Ink(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  colors.primaryContainer.withValues(
+                                    alpha: 0.38,
+                                  ),
+                                  colors.secondaryContainer.withValues(
+                                    alpha: 0.24,
+                                  ),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: _selectedFile != null
+                                    ? colors.primary.withValues(alpha: 0.4)
+                                    : colors.outlineVariant.withValues(
+                                        alpha: 0.28,
+                                      ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    color: colors.surface.withValues(
+                                      alpha: 0.72,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    PhosphorIcons.filePdf(),
+                                    color: _selectedFile != null
+                                        ? colors.primary
+                                        : colors.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _fileName ?? 'Select PDF document',
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _selectedFile != null
+                                            ? 'File attached and ready to upload'
+                                            : 'Upload the file runners need for this task',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: colors.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  _selectedFile != null
+                                      ? PhosphorIcons.checkCircle()
+                                      : PhosphorIcons.uploadSimple(),
+                                  color: _selectedFile != null
+                                      ? colors.primary
+                                      : colors.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _priceController,
+                          keyboardType: TextInputType.number,
+                          decoration: _inputDecoration(
+                            '₹20',
+                            PhosphorIcons.currencyInr(),
+                          ),
+                          validator: AppValidators.validatePrice,
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: ['20', '40', '60'].map((price) {
+                            final selected = _priceController.text == price;
+                            return ChoiceChip(
+                              label: Text('₹$price'),
+                              selected: selected,
+                              onSelected: (_) {
+                                setState(() => _priceController.text = price);
+                              },
+                              selectedColor: colors.tertiaryContainer,
+                              backgroundColor: colors.surfaceContainerHighest
+                                  .withValues(alpha: 0.55),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              side: BorderSide(
+                                color: selected
+                                    ? colors.tertiary.withValues(alpha: 0.35)
+                                    : colors.outlineVariant.withValues(
+                                        alpha: 0.25,
+                                      ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Suggested: ₹20 for nearby runs, ₹40+ for longer hostel routes.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fade(delay: 200.ms).slideY(begin: 0.06, end: 0),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: colors.surface.withValues(alpha: 0.8),
+                      border: Border.all(
+                        color: colors.outlineVariant.withValues(alpha: 0.28),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.shadow.withValues(alpha: 0.06),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: colors.primaryContainer.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                              child: Icon(
+                                PhosphorIcons.paperPlaneTilt(),
+                                color: colors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ready to send',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Post the task and notify runners nearby.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [colors.primary, colors.secondary],
+                            ),
+                          ),
+                          child: PrimaryButton(
+                            text: 'Post Task',
+                            isLoading: _isUploading,
+                            onPressed: _postTask,
+                            color: Colors.transparent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fade(delay: 260.ms).slideY(begin: 0.06, end: 0),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // --- HELPER FUNCTIONS ---
   InputDecoration _inputDecoration(String hint, IconData icon) {
+    final colors = Theme.of(context).colorScheme;
+
     return InputDecoration(
       prefixIcon: Icon(icon),
       hintText: hint,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: colors.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: colors.primary, width: 1.4),
+      ),
       filled: true,
-      fillColor: Theme.of(context).cardColor,
+      fillColor: colors.surface.withValues(alpha: 0.78),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+  Widget _buildHeroCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.primaryContainer.withValues(alpha: 0.8),
+            colors.secondaryContainer.withValues(alpha: 0.6),
+            colors.tertiaryContainer.withValues(alpha: 0.58),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: colors.surface.withValues(alpha: 0.75),
+                ),
+                child: Icon(
+                  PhosphorIcons.paperPlaneTilt(),
+                  color: colors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Create a task that gets accepted fast',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Clear route, fair tip, attached document. Keep it simple and sharp.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: colors.surface.withValues(alpha: 0.64),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isListening ? Icons.hearing : Icons.mic_none,
+                  color: colors.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isListening ? 'Listening now...' : 'Voice quick-fill',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _lastTranscript.isEmpty
+                            ? 'Say: pickup Admin Block, drop Girls Hostel C, item print notes, price 40'
+                            : _lastTranscript,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _toggleListening,
+                  icon: Icon(_isListening ? Icons.stop : Icons.mic),
+                  label: Text(_isListening ? 'Stop' : 'Speak'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildFormSection(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        color: colors.surface.withValues(alpha: 0.8),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: colors.primaryContainer.withValues(alpha: 0.7),
+                ),
+                child: Icon(icon, color: colors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  IconData _transportIcon(String mode) {
+    switch (mode.toLowerCase()) {
+      case 'walking':
+        return PhosphorIcons.personSimpleWalk();
+      case 'cycling':
+        return PhosphorIcons.bicycle();
+      case 'vehicle':
+        return PhosphorIcons.car();
+      default:
+        return PhosphorIcons.navigationArrow();
+    }
   }
 }
