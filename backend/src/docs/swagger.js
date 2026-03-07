@@ -54,11 +54,51 @@ const swaggerDocument = {
     { name: "Auth", description: "Authentication and session routes" },
     { name: "Profile", description: "Protected profile routes" },
     { name: "Tasks", description: "Protected task access routes" },
+    { name: "Wallet", description: "Wallet balance and ledger routes" },
   ],
   components: {
     securitySchemes: bearerSecurityScheme,
     schemas: {
       User: userSchema,
+      WalletTransaction: {
+        type: "object",
+        properties: {
+          id: { type: "string", example: "67ca72d999ea40f2abc45678" },
+          user: { $ref: "#/components/schemas/User" },
+          type: { type: "string", enum: ["credit", "debit"], example: "credit" },
+          amount: { type: "number", example: 150 },
+          status: {
+            type: "string",
+            enum: ["pending", "completed", "failed"],
+            example: "completed",
+          },
+          description: {
+            type: "string",
+            example: "Manual payout credit for completed campus task",
+          },
+          reference: { type: "string", example: "TASK-PAYOUT-001" },
+          failureReason: { type: "string", example: "Bank transfer rejected" },
+          initiatedBy: {
+            anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+          },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      WalletBalance: {
+        type: "object",
+        properties: {
+          userId: { type: "string", example: "67ca72d999ea40f2abc12345" },
+          currentBalance: { type: "number", example: 420 },
+          totalCredited: { type: "number", example: 650 },
+          totalDebited: { type: "number", example: 230 },
+          pendingCredits: { type: "number", example: 100 },
+          pendingDebits: { type: "number", example: 50 },
+          failedTransactions: { type: "integer", example: 1 },
+          transactionCount: { type: "integer", example: 8 },
+          currency: { type: "string", example: "INR" },
+        },
+      },
       RegisterRequest: {
         type: "object",
         required: ["fullName", "email", "password"],
@@ -114,6 +154,39 @@ const swaggerDocument = {
           },
         },
       },
+      CreateWalletTransactionRequest: {
+        type: "object",
+        required: ["userId", "amount", "description"],
+        properties: {
+          userId: { type: "string", example: "67ca72d999ea40f2abc12345" },
+          amount: { type: "number", example: 150 },
+          description: {
+            type: "string",
+            example: "Manual payout credit for completed campus task",
+          },
+          reference: { type: "string", example: "TASK-PAYOUT-001" },
+          status: {
+            type: "string",
+            enum: ["pending", "completed", "failed"],
+            example: "completed",
+          },
+        },
+      },
+      UpdateWalletTransactionStatusRequest: {
+        type: "object",
+        required: ["status"],
+        properties: {
+          status: {
+            type: "string",
+            enum: ["pending", "completed", "failed"],
+            example: "failed",
+          },
+          failureReason: {
+            type: "string",
+            example: "Payment settlement failed",
+          },
+        },
+      },
       AuthResponse: apiResponse(
         {
           type: "object",
@@ -136,6 +209,35 @@ const swaggerDocument = {
           },
         },
       },
+      WalletBalanceResponse: apiResponse(
+        { $ref: "#/components/schemas/WalletBalance" },
+        "Wallet balance fetched successfully",
+      ),
+      WalletTransactionResponse: apiResponse(
+        { $ref: "#/components/schemas/WalletTransaction" },
+        "Wallet transaction fetched successfully",
+      ),
+      WalletTransactionListResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            items: {
+              type: "array",
+              items: { $ref: "#/components/schemas/WalletTransaction" },
+            },
+            pagination: {
+              type: "object",
+              properties: {
+                page: { type: "integer", example: 1 },
+                limit: { type: "integer", example: 20 },
+                total: { type: "integer", example: 8 },
+                totalPages: { type: "integer", example: 1 },
+              },
+            },
+          },
+        },
+        "Wallet transactions fetched successfully",
+      ),
     },
   },
   paths: {
@@ -401,6 +503,163 @@ const swaggerDocument = {
           },
           403: {
             description: "Runner/admin only route",
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/balance": {
+      get: {
+        tags: ["Wallet"],
+        summary: "Get current user's wallet balance",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Wallet balance fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletBalanceResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/transactions": {
+      get: {
+        tags: ["Wallet"],
+        summary: "Get wallet transaction history",
+        description:
+          "Returns the current user's wallet history. Admins can optionally pass a userId query parameter to inspect another user's ledger.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: { type: "string", enum: ["pending", "completed", "failed"] },
+          },
+          {
+            in: "query",
+            name: "type",
+            schema: { type: "string", enum: ["credit", "debit"] },
+          },
+          {
+            in: "query",
+            name: "userId",
+            schema: { type: "string" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", example: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", example: 20 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Wallet transactions fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionListResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/transactions/credit": {
+      post: {
+        tags: ["Wallet"],
+        summary: "Create a wallet credit entry",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateWalletTransactionRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Wallet credit transaction created successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Admin only route",
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/transactions/debit": {
+      post: {
+        tags: ["Wallet"],
+        summary: "Create a wallet debit entry",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateWalletTransactionRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Wallet debit transaction created successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Admin only route",
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/transactions/{transactionId}/status": {
+      patch: {
+        tags: ["Wallet"],
+        summary: "Update wallet transaction status",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "transactionId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/UpdateWalletTransactionStatusRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Wallet transaction status updated successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+          409: {
+            description: "Illegal status transition",
           },
         },
       },
