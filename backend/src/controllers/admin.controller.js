@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import { Report, allowedReportEntityTypes, allowedReportStatuses } from "../models/report.model.js";
 import { Task } from "../models/task.model.js";
 import { User } from "../models/user.model.js";
+import { sanitizeUser as sanitizeProfileUser } from "./profile.controller.js";
+import { validateCampusScopesInput } from "../utils/campusScope.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -267,4 +269,67 @@ const updateReportStatus = asyncHandler(async (req, res) => {
   );
 });
 
-export { archiveTask, listReportedIssues, suspendUser, updateReportStatus };
+const getUserCampusScopes = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  ensureValidObjectId(userId, "user id");
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: sanitizeProfileUser(user),
+        campusScopes: user.campusScopes || [],
+      },
+      "User campus scopes fetched successfully",
+    ),
+  );
+});
+
+const updateUserCampusScopes = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { campusScopes } = req.body;
+
+  ensureValidObjectId(userId, "user id");
+
+  const sanitizedScopes = validateCampusScopesInput(campusScopes);
+  const user = await User.findByIdAndUpdate(
+    userId,
+    {
+      campusScopes: sanitizedScopes,
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: sanitizeProfileUser(user),
+        campusScopes: user.campusScopes || [],
+      },
+      "User campus scopes updated successfully",
+    ),
+  );
+});
+
+export {
+  archiveTask,
+  getUserCampusScopes,
+  listReportedIssues,
+  suspendUser,
+  updateReportStatus,
+  updateUserCampusScopes,
+};

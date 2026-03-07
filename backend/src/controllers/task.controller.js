@@ -6,6 +6,7 @@ import {
   allowedTransportModes,
   Task,
 } from "../models/task.model.js";
+import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -311,7 +312,7 @@ const fetchTaskForAssignment = async (taskId) => {
   ensureValidTaskId(taskId);
 
   const task = await Task.findById(taskId).select(
-    "requestedBy assignedRunner status acceptedAt assignmentExpiresAt isArchived",
+    "requestedBy assignedRunner status acceptedAt assignmentExpiresAt isArchived campus",
   );
 
   if (!task) {
@@ -352,10 +353,10 @@ const createTask = asyncHandler(async (req, res) => {
     reward,
   } = req.body;
 
-  if (!title || !description || !pickupLocation || !dropoffLocation) {
+  if (!title || !description || !pickupLocation || !dropoffLocation || !campus) {
     throw new ApiError(
       400,
-      "title, description, pickupLocation and dropoffLocation are required",
+      "title, description, pickupLocation, dropoffLocation and campus are required",
     );
   }
 
@@ -368,12 +369,17 @@ const createTask = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid transport mode provided");
   }
 
+  const normalizedCampus =
+    req.user.role === "admin"
+      ? campus.trim()
+      : ensureUserHasCampusAccess(req.user, campus, "create");
+
   const task = await Task.create({
     title: title.trim(),
     description: description.trim(),
     pickupLocation: pickupLocation.trim(),
     dropoffLocation: dropoffLocation.trim(),
-    campus: campus?.trim() || "",
+    campus: normalizedCampus,
     transportMode: transportMode || "other",
     reward: normalizedReward,
     requestedBy: req.user._id,
@@ -463,6 +469,10 @@ const acceptTask = asyncHandler(async (req, res) => {
       409,
       `Only open tasks can be accepted. Current status: ${existingTask.status}`,
     );
+  }
+
+  if (req.user.role !== "admin") {
+    ensureUserHasCampusAccess(req.user, existingTask.campus, "accept");
   }
 
   const acceptedAt = new Date();

@@ -19,6 +19,10 @@ const userSchema = {
     phoneNumber: { type: "string", example: "+91-9876543210" },
     campusId: { type: "string", example: "vit-bhopal" },
     campusName: { type: "string", example: "VIT Bhopal" },
+    campusScopes: {
+      type: "array",
+      items: { $ref: "#/components/schemas/CampusScope" },
+    },
     role: { type: "string", enum: ["requester", "runner", "admin"] },
     isVerified: { type: "boolean", example: true },
     isActive: { type: "boolean", example: true },
@@ -210,6 +214,13 @@ const swaggerDocument = {
       WalletTransaction: walletTransactionSchema,
       WalletBalance: walletBalanceSchema,
       Report: reportSchema,
+      CampusScope: {
+        type: "object",
+        properties: {
+          campusId: { type: "string", example: "north-campus" },
+          campusName: { type: "string", example: "North Campus" },
+        },
+      },
       RegisterRequest: {
         type: "object",
         required: ["fullName", "email", "password"],
@@ -297,9 +308,11 @@ const swaggerDocument = {
         required: ["isActive"],
         properties: {
           isActive: { type: "boolean", example: false },
+        },
+      },
       CreateTaskRequest: {
         type: "object",
-        required: ["title", "description", "pickupLocation", "dropoffLocation"],
+        required: ["title", "description", "pickupLocation", "dropoffLocation", "campus"],
         properties: {
           title: { type: "string", example: "Pick up lab printouts" },
           description: {
@@ -308,9 +321,6 @@ const swaggerDocument = {
           },
           pickupLocation: { type: "string", example: "Academic Block A" },
           dropoffLocation: { type: "string", example: "Hostel 3 Reception" },
-          reward: { type: "number", example: 80 },
-        },
-      },
           campus: { type: "string", example: "VIT Bhopal" },
           transportMode: {
             type: "string",
@@ -320,6 +330,29 @@ const swaggerDocument = {
           reward: { type: "number", example: 80 },
         },
       },
+      UpdateCampusScopesRequest: {
+        type: "object",
+        required: ["campusScopes"],
+        properties: {
+          campusScopes: {
+            type: "array",
+            items: { $ref: "#/components/schemas/CampusScope" },
+          },
+        },
+      },
+      CampusScopesResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            user: { $ref: "#/components/schemas/User" },
+            campusScopes: {
+              type: "array",
+              items: { $ref: "#/components/schemas/CampusScope" },
+            },
+          },
+        },
+        "User campus scopes fetched successfully",
+      ),
       TaskFeedResponse: apiResponse(
         {
           type: "object",
@@ -963,6 +996,7 @@ const swaggerDocument = {
       post: {
         tags: ["Tasks"],
         summary: "Create a new task",
+        description: "Non-admin users can create tasks only for campuses included in their admin-managed campus scopes.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -980,6 +1014,9 @@ const swaggerDocument = {
                 schema: { $ref: "#/components/schemas/TaskResponse" },
               },
             },
+          },
+          403: {
+            description: "Campus access denied for task creation",
           },
         },
       },
@@ -1013,6 +1050,7 @@ const swaggerDocument = {
       patch: {
         tags: ["Tasks"],
         summary: "Accept an open task atomically",
+        description: "Runners can accept only tasks whose campus matches one of their admin-managed campus scopes.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1032,7 +1070,7 @@ const swaggerDocument = {
             },
           },
           403: {
-            description: "Requester cannot accept their own task",
+            description: "Requester cannot accept their own task or runner lacks campus access",
           },
           409: {
             description: "Task already accepted or not open",
@@ -1271,6 +1309,62 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "User suspended successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/admin/users/{userId}/campus-scopes": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get admin-managed campus scopes for a user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "User campus scopes fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CampusScopesResponse" },
+              },
+            },
+          },
+        },
+      },
+      put: {
+        tags: ["Admin"],
+        summary: "Replace admin-managed campus scopes for a user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateCampusScopesRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "User campus scopes updated successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CampusScopesResponse" },
+              },
+            },
           },
         },
       },

@@ -21,6 +21,10 @@ const sanitizeUser = (user) => ({
   phoneNumber: user.phoneNumber,
   campusId: user.campusId,
   campusName: user.campusName,
+  campusScopes: (user.campusScopes || []).map((scope) => ({
+    campusId: scope.campusId,
+    campusName: scope.campusName,
+  })),
   role: user.role,
   isVerified: user.isVerified,
   isActive: user.isActive,
@@ -315,6 +319,7 @@ const deleteUserProfile = asyncHandler(async (req, res) => {
 });
 
 export {
+  sanitizeUser,
   deleteUserProfile,
   getMyProfile,
   getUserProfileById,

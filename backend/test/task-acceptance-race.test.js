@@ -43,6 +43,7 @@ const createUser = async ({ fullName, email, role }) => {
     phoneNumber: "",
     campusId: "",
     campusName: "",
+    campusScopes: [{ campusId: "vit-bhopal", campusName: "VIT Bhopal" }],
   });
 };
 
@@ -93,6 +94,7 @@ describe("task acceptance concurrency", () => {
       description: "Collect documents from the admin block",
       pickupLocation: "Admin Block",
       dropoffLocation: "Library",
+      campus: "VIT Bhopal",
       reward: 150,
       requestedBy: requester._id,
     });
