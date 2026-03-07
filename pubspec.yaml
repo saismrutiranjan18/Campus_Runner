@@ -59,6 +59,7 @@ dependencies:
   flutter_background_service: ^5.0.11
   flutter_local_notifications: ^18.0.1
   permission_handler: ^11.3.1
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:
