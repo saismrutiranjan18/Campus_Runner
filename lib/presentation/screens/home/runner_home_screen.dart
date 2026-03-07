@@ -114,7 +114,6 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
           },
           icon: const Icon(Icons.leaderboard),
         ),
-          IconButton(onPressed: () {}, icon: Icon(PhosphorIcons.funnel())),
           IconButton(onPressed: () {}, icon: Icon(PhosphorIcons.bell())),
           IconButton(
             onPressed: () {
@@ -230,24 +229,23 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.filter_list),
-                  label: const Text("Filter"),
+                const Text('Sort by: '),
+                DropdownButton<String>(
+                  value: sortType,
+                  items: const [
+                    DropdownMenuItem(value: 'latest', child: Text('Latest created')),
+                    DropdownMenuItem(value: 'highest_price', child: Text('Highest price')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        sortType = value;
+                      });
+                    }
+                  },
                 ),
-                ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    sortType = sortType == "highest_price"
-                        ? "latest"
-                        : "highest_price";
-                  });
-                },
-                icon: const Icon(Icons.sort),
-                label: const Text("Sort"),
-              ),
               ],
             ),
           ),
