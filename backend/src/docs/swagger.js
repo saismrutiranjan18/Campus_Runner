@@ -348,6 +348,9 @@ const swaggerDocument = {
                 campus: { type: "string", example: "VIT Bhopal" },
                 status: { type: "string", example: "open" },
                 transportMode: { type: "string", example: "bike" },
+                fromDate: { type: "string", example: "2026-03-01" },
+                toDate: { type: "string", example: "2026-03-08" },
+                archived: { type: "boolean", example: false },
               },
             },
           },
@@ -856,6 +859,76 @@ const swaggerDocument = {
         },
       },
     },
+    "/api/v1/tasks/history": {
+      get: {
+        tags: ["Tasks"],
+        summary: "Get requester task history",
+        description:
+          "Requester-only route that returns the authenticated requester's own tasks with pagination, status filters, created-date filters, and search by title or location fields.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "search",
+            schema: { type: "string", example: "library" },
+          },
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["open", "accepted", "in_progress", "completed", "cancelled"],
+            },
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", example: "2026-03-01" },
+            description: "Inclusive lower bound for task createdAt. Supports ISO timestamps or YYYY-MM-DD.",
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", example: "2026-03-08" },
+            description: "Inclusive upper bound for task createdAt. Supports ISO timestamps or YYYY-MM-DD.",
+          },
+          {
+            in: "query",
+            name: "sort",
+            schema: { type: "string", enum: ["asc", "desc"], example: "desc" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", example: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", example: 20 },
+          },
+          {
+            in: "query",
+            name: "cursor",
+            schema: { type: "string" },
+            description: "Optional cursor token for cursor-based pagination; when provided, page is ignored.",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Requester task history fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/TaskFeedResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Requester role required",
+          },
+        },
+      },
+    },
     "/api/v1/tasks/open": {
       get: {
         tags: ["Tasks"],
@@ -926,6 +999,16 @@ const swaggerDocument = {
               type: "string",
               enum: ["walk", "bike", "car", "public_transport", "other"],
             },
+          },
+          {
+            in: "query",
+            name: "fromDate",
+            schema: { type: "string", example: "2026-03-01" },
+          },
+          {
+            in: "query",
+            name: "toDate",
+            schema: { type: "string", example: "2026-03-08" },
           },
           {
             in: "query",

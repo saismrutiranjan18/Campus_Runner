@@ -6,6 +6,7 @@ import {
   completeTask,
   createTask,
   getTaskById,
+  listRequesterTaskHistory,
   listTasks,
   listOpenTasks,
   listProtectedTaskActions,
@@ -18,6 +19,7 @@ const router = Router();
 router.use(verifyJWT);
 
 router.get("/protected-actions", listProtectedTaskActions);
+router.get("/history", authorizeRoles("requester"), listRequesterTaskHistory);
 router.get("/", listTasks);
 router.get("/open", listOpenTasks);
 router.get("/:taskId", getTaskById);
