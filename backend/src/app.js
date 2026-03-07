@@ -9,6 +9,7 @@ import { errorHandler } from "./middlewares/error.middleware.js";
 import authRouter from "./routes/auth.routes.js";
 import profileRouter from "./routes/profile.routes.js";
 import taskRouter from "./routes/task.routes.js";
+import walletRouter from "./routes/wallet.routes.js";
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.get("/api/v1/health", (_, res) => {
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/profile", profileRouter)
 app.use("/api/v1/tasks", taskRouter)
+app.use("/api/v1/wallet", walletRouter)
 
 app.use((_, __, next) => {
     next(new ApiError(404, "Route not found"))
