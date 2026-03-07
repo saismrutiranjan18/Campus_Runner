@@ -57,6 +57,10 @@ const sanitizeTask = (task) => ({
   completedAt: task.completedAt,
   cancelledAt: task.cancelledAt,
   cancellationReason: task.cancellationReason,
+  isArchived: task.isArchived,
+  archivedAt: task.archivedAt,
+  archiveReason: task.archiveReason,
+  archivedBy: sanitizeTaskUser(task.archivedBy),
   createdAt: task.createdAt,
   updatedAt: task.updatedAt,
 });
@@ -262,7 +266,13 @@ const assertTransitionAllowed = (task, nextStatus) => {
 const fetchTaskOrThrow = async (taskId) => {
   ensureValidTaskId(taskId);
 
-  const task = await Task.findById(taskId).populate(populateTaskFields);
+  const task = await Task.findById(taskId).populate([
+    ...populateTaskFields,
+    {
+      path: "archivedBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+  ]);
 
   if (!task) {
     throw new ApiError(404, "Task not found");
@@ -271,6 +281,10 @@ const fetchTaskOrThrow = async (taskId) => {
   return task;
 };
 
+const ensureTaskNotArchived = (task) => {
+  if (task.isArchived) {
+    throw new ApiError(409, "Archived tasks cannot be modified through lifecycle routes");
+  }
 const fetchTaskForAssignment = async (taskId) => {
   ensureValidTaskId(taskId);
 
@@ -342,6 +356,16 @@ const createTask = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, sanitizeTask(createdTask), "Task created successfully"));
 });
 
+const listOpenTasks = asyncHandler(async (_, res) => {
+  const tasks = await Task.find({ status: "open", isArchived: false })
+    .populate([
+      ...populateTaskFields,
+      {
+        path: "archivedBy",
+        select: "fullName email phoneNumber role isVerified isActive",
+      },
+    ])
+    .sort({ createdAt: -1 });
 const listOpenTasks = asyncHandler(async (req, res) => {
   const { items, pagination } = await fetchTaskFeed(req.query, { status: "open" });
 
@@ -398,6 +422,8 @@ const acceptTask = asyncHandler(async (req, res) => {
   const taskId = req.params.taskId;
   const existingTask = await fetchTaskForAssignment(taskId);
 
+  ensureTaskNotArchived(task);
+  assertTransitionAllowed(task, "accepted");
   if (String(existingTask.requestedBy) === String(req.user._id)) {
     throw new ApiError(403, "Requesters cannot accept their own task");
   }
@@ -450,6 +476,7 @@ const acceptTask = asyncHandler(async (req, res) => {
 const markTaskInProgress = asyncHandler(async (req, res) => {
   const task = await fetchTaskOrThrow(req.params.taskId);
 
+  ensureTaskNotArchived(task);
   ensureAssignedRunner(task, req.user);
   assertTransitionAllowed(task, "in_progress");
 
@@ -467,6 +494,7 @@ const markTaskInProgress = asyncHandler(async (req, res) => {
 const completeTask = asyncHandler(async (req, res) => {
   const task = await fetchTaskOrThrow(req.params.taskId);
 
+  ensureTaskNotArchived(task);
   ensureAssignedRunner(task, req.user);
   assertTransitionAllowed(task, "completed");
 
@@ -485,6 +513,7 @@ const cancelTask = asyncHandler(async (req, res) => {
   const task = await fetchTaskOrThrow(req.params.taskId);
   const { cancellationReason } = req.body;
 
+  ensureTaskNotArchived(task);
   ensureTaskRequesterOrAdmin(task, req.user);
   assertTransitionAllowed(task, "cancelled");
 

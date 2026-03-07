@@ -22,6 +22,10 @@ const userSchema = {
     role: { type: "string", enum: ["requester", "runner", "admin"] },
     isVerified: { type: "boolean", example: true },
     isActive: { type: "boolean", example: true },
+    suspendedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    suspensionReason: { type: "string", example: "Suspended by admin moderation" },
     createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", format: "date-time" },
   },
@@ -50,8 +54,16 @@ const taskSchema = {
       enum: ["open", "accepted", "in_progress", "completed", "cancelled"],
       example: "open",
     },
+    isArchived: { type: "boolean", example: false },
+    archivedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    archiveReason: { type: "string", example: "Archived by admin moderation" },
     requestedBy: { $ref: "#/components/schemas/User" },
     assignedRunner: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
+    archivedBy: {
       anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
     },
     acceptedAt: {
@@ -113,6 +125,37 @@ const walletBalanceSchema = {
   },
 };
 
+const reportSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string", example: "67ca72d999ea40f2abc65432" },
+    entityType: { type: "string", enum: ["user", "task"], example: "task" },
+    reporter: { $ref: "#/components/schemas/User" },
+    reportedUser: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
+    reportedTask: {
+      anyOf: [{ $ref: "#/components/schemas/Task" }, { type: "null" }],
+    },
+    reason: { type: "string", example: "Fake task listing" },
+    details: { type: "string", example: "The requester repeatedly posts invalid offers." },
+    status: {
+      type: "string",
+      enum: ["open", "reviewed", "resolved", "dismissed"],
+      example: "open",
+    },
+    reviewedBy: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
+    reviewedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    resolutionNote: { type: "string", example: "Suspended offending user and archived related task." },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+};
+
 const apiResponse = (dataSchema, messageExample = "Success") => ({
   type: "object",
   properties: {
@@ -129,6 +172,7 @@ const swaggerDocument = {
     title: "Campus Runner Backend API",
     version: "1.0.0",
     description:
+      "JWT authentication, role-based authorization, profile, task, wallet, and admin moderation APIs for Campus Runner.",
       "JWT authentication, role-based authorization, profile APIs, task lifecycle APIs, and wallet APIs for Campus Runner.",
   },
   servers: [
@@ -141,8 +185,9 @@ const swaggerDocument = {
     { name: "Health", description: "Service status routes" },
     { name: "Auth", description: "Authentication and session routes" },
     { name: "Profile", description: "Protected profile routes" },
-    { name: "Tasks", description: "Protected task access routes" },
+    { name: "Tasks", description: "Protected task lifecycle routes" },
     { name: "Wallet", description: "Wallet balance and ledger routes" },
+    { name: "Admin", description: "Admin moderation routes" },
   ],
   components: {
     securitySchemes: bearerSecurityScheme,
@@ -151,6 +196,7 @@ const swaggerDocument = {
       Task: taskSchema,
       WalletTransaction: walletTransactionSchema,
       WalletBalance: walletBalanceSchema,
+      Report: reportSchema,
       RegisterRequest: {
         type: "object",
         required: ["fullName", "email", "password"],
@@ -249,6 +295,9 @@ const swaggerDocument = {
           },
           pickupLocation: { type: "string", example: "Academic Block A" },
           dropoffLocation: { type: "string", example: "Hostel 3 Reception" },
+          reward: { type: "number", example: 80 },
+        },
+      },
           campus: { type: "string", example: "VIT Bhopal" },
           transportMode: {
             type: "string",
@@ -334,6 +383,39 @@ const swaggerDocument = {
           },
         },
       },
+      SuspendUserRequest: {
+        type: "object",
+        properties: {
+          suspensionReason: {
+            type: "string",
+            example: "Repeated abuse reports from runners",
+          },
+        },
+      },
+      ArchiveTaskRequest: {
+        type: "object",
+        properties: {
+          archiveReason: {
+            type: "string",
+            example: "Fake or abusive task listing",
+          },
+        },
+      },
+      UpdateReportStatusRequest: {
+        type: "object",
+        required: ["status"],
+        properties: {
+          status: {
+            type: "string",
+            enum: ["open", "reviewed", "resolved", "dismissed"],
+            example: "resolved",
+          },
+          resolutionNote: {
+            type: "string",
+            example: "Suspended offending user and archived related task",
+          },
+        },
+      },
       AuthResponse: apiResponse(
         {
           type: "object",
@@ -362,6 +444,8 @@ const swaggerDocument = {
       ),
       TaskListResponse: apiResponse(
         {
+          type: "array",
+          items: { $ref: "#/components/schemas/Task" },
           type: "object",
           properties: {
             items: {
@@ -406,6 +490,38 @@ const swaggerDocument = {
           },
         },
         "Wallet transactions fetched successfully",
+      ),
+      ReportResponse: apiResponse(
+        { $ref: "#/components/schemas/Report" },
+        "Report status updated successfully",
+      ),
+      ReportListResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            items: {
+              type: "array",
+              items: { $ref: "#/components/schemas/Report" },
+            },
+            pagination: {
+              type: "object",
+              properties: {
+                page: { type: "integer", example: 1 },
+                limit: { type: "integer", example: 20 },
+                total: { type: "integer", example: 8 },
+                totalPages: { type: "integer", example: 1 },
+              },
+            },
+            filters: {
+              type: "object",
+              properties: {
+                status: { type: "string", example: "open" },
+                entityType: { type: "string", example: "task" },
+              },
+            },
+          },
+        },
+        "Reported issues fetched successfully",
       ),
     },
   },
@@ -564,9 +680,6 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "Profiles fetched successfully",
-          },
-          403: {
-            description: "Admin only route",
           },
         },
       },
@@ -880,9 +993,6 @@ const swaggerDocument = {
               },
             },
           },
-          404: {
-            description: "Task not found",
-          },
         },
       },
     },
@@ -902,11 +1012,21 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "Task accepted successfully",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TaskResponse" },
-              },
-            },
+          },
+        },
+      },
+    },
+    "/api/v1/tasks/{taskId}/in-progress": {
+      patch: {
+        tags: ["Tasks"],
+        summary: "Mark an accepted task as in progress",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string" },
           },
           403: {
             description: "Requester cannot accept their own task",
@@ -1006,8 +1126,6 @@ const swaggerDocument = {
       get: {
         tags: ["Wallet"],
         summary: "Get wallet transaction history",
-        description:
-          "Returns the current user's wallet history. Admins can optionally pass a userId query parameter to inspect another user's ledger.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1121,6 +1239,137 @@ const swaggerDocument = {
         },
         responses: {
           200: {
+            description: "Wallet transaction status updated successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/admin/users/{userId}/suspend": {
+      patch: {
+        tags: ["Admin"],
+        summary: "Suspend a user account",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SuspendUserRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "User suspended successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/admin/tasks/{taskId}/archive": {
+      patch: {
+        tags: ["Admin"],
+        summary: "Archive a task",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ArchiveTaskRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Task archived successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/admin/reports": {
+      get: {
+        tags: ["Admin"],
+        summary: "List reported issues",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: { type: "string", enum: ["open", "reviewed", "resolved", "dismissed"] },
+          },
+          {
+            in: "query",
+            name: "entityType",
+            schema: { type: "string", enum: ["user", "task"] },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", example: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", example: 20 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Reported issues fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ReportListResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/admin/reports/{reportId}/status": {
+      patch: {
+        tags: ["Admin"],
+        summary: "Update report moderation status",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "reportId",
+            name: "transactionId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateReportStatusRequest" },
+              schema: { $ref: "#/components/schemas/UpdateWalletTransactionStatusRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Report status updated successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ReportResponse" },
+              },
+            },
             description: "Wallet transaction status updated successfully",
           },
         },

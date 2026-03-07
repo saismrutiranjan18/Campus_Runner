@@ -6,6 +6,7 @@ import swaggerUi from "swagger-ui-express";
 import { ApiError } from "./utils/ApiError.js";
 import { swaggerDocument } from "./docs/swagger.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
+import adminRouter from "./routes/admin.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import profileRouter from "./routes/profile.routes.js";
 import taskRouter from "./routes/task.routes.js";
@@ -42,6 +43,7 @@ app.get("/api/v1/health", (_, res) => {
 })
 
 app.use("/api/v1/auth", authRouter)
+app.use("/api/v1/admin", adminRouter)
 app.use("/api/v1/profile", profileRouter)
 app.use("/api/v1/tasks", taskRouter)
 app.use("/api/v1/wallet", walletRouter)
