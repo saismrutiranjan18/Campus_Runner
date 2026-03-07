@@ -7,6 +7,7 @@ import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'core/config/app_mode.dart';
+import 'presentation/screens/splash_screen.dart';
 import 'core/themes/theme_provider.dart';
 import 'presentation/screens/home/runner_home_screen.dart';
 
@@ -101,7 +102,7 @@ class CampusRunnerApp extends ConsumerWidget {
       themeMode: themeMode,
       // --- HOME SCREEN ---
       // Guest browsing by default.
-      home: const RunnerHomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }

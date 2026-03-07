@@ -16,6 +16,7 @@ import '../../../core/themes/theme_provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../auth/login_screen.dart';
 import '../../widgets/cards/task_card.dart';
+import '../../widgets/loaders/aurora_loader.dart';
 import 'campuses_screen.dart';
 import 'register_shop_screen.dart';
 import 'requester_home_screen.dart';
@@ -221,7 +222,14 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                   },
                 );
               },
-              loading: () => const LinearProgressIndicator(),
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: AuroraLoader(
+                  size: 42,
+                  strokeWidth: 6,
+                  label: 'Loading campuses',
+                ),
+              ),
               error: (error, _) => Text('Error: $error'),
             ),
           ),
@@ -253,22 +261,9 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
             Expanded(
               child: tasksAsync.when(
               // A. LOADING STATE
-              loading: () => Skeletonizer(
-                enabled: true,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: 6,
-                  itemBuilder: (context, index) {
-                    return const TaskCard(
-                      title: "Loading Task Title...",
-                      pickup: "Loading Location...",
-                      drop: "Loading Drop...",
-                      price: "...",
-                      time: "...",
-                      transportMode: "Walking",
-                    );
-                  },
-                ),
+              loading: () => const FullScreenAuroraLoader(
+                label: 'Fetching tasks',
+                subtitle: 'Finding the latest campus requests for you',
               ),
 
               // B. ERROR STATE
