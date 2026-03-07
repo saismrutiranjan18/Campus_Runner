@@ -8,11 +8,27 @@ import '../../../core/utils/formatters.dart';
 import 'live_tracking_screen.dart';
 import '../../../data/services/notification_service.dart';
 
-class MyTasksScreen extends ConsumerWidget {
+class MyTasksScreen extends ConsumerStatefulWidget {
   const MyTasksScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyTasksScreen> createState() => _MyTasksScreenState();
+}
+
+class _MyTasksScreenState extends ConsumerState<MyTasksScreen> {
+  String _selectedStatus = 'All';
+  String _sortOption = 'Latest';
+
+  final List<String> _statusOptions = [
+    'All',
+    'Open',
+    'In Progress',
+    'Completed',
+    'Cancelled'
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     final currentUser = ref.watch(authRepositoryProvider).getCurrentUser();
 
     if (currentUser == null) {
@@ -28,94 +44,134 @@ class MyTasksScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Tasks'),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('tasks')
-            .where('requesterId', isEqualTo: currentUser.uid)
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      PhosphorIcons.clipboardText(),
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "No Tasks Available",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "You don't have any tasks yet.\nNew tasks will appear here once they are created.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14,
-                      ),
-                    ),
+      body: Column(
+        children: [
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: _statusOptions.map((status) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(status),
+                    selected: _selectedStatus == status,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedStatus = status;
+                        });
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          
+          // Sort Dropdown
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text('Sort by: '),
+                DropdownButton<String>(
+                  value: _sortOption,
+                  items: const [
+                    DropdownMenuItem(value: 'Latest', child: Text('Latest created')),
+                    DropdownMenuItem(value: 'Highest Price', child: Text('Highest price')),
                   ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _sortOption = value;
+                      });
+                    }
+                  },
                 ),
-              ),
-            );
-          }
-                    
-          final docs = snapshot.data!.docs;
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('tasks')
+                  .where('requesterId', isEqualTo: currentUser.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          for (var task in docs) {
-            final status = task['status'];
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
 
-            if (status == 'accepted') {
-              print("Task accepted by runner");
-            }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState();
+                }
 
-            if (status == 'picked_up') {
-              print("Task picked up");
-            }
+                var tasks = snapshot.data!.docs
+                    .map((doc) => TaskModel.fromMap(
+                          doc.data() as Map<String, dynamic>,
+                          doc.id,
+                        ))
+                    .toList();
 
-            if (status == 'delivered') {
-              print("Task delivered");
-            }
+                // 1. FILTER
+                if (_selectedStatus != 'All') {
+                  final mappedStatus = _selectedStatus.toUpperCase().replaceAll(' ', '_');
+                  tasks = tasks.where((task) => task.status == mappedStatus).toList();
+                }
 
-            if (status == 'cancelled') {
-              print("Task cancelled");
-            }
-          }
+                if (tasks.isEmpty) {
+                  return _buildEmptyState();
+                }
 
-          final tasks = docs
-              .map((doc) => TaskModel.fromMap(
-                    doc.data() as Map<String, dynamic>,
-                    doc.id,
-                  ))
-              .toList();
+                // 2. SORT
+                if (_sortOption == 'Latest') {
+                  tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                } else if (_sortOption == 'Highest Price') {
+                  // Ensure we parse price correctly even if it's string-based
+                   tasks.sort((a, b) {
+                     final priceA = double.tryParse(a.price) ?? 0.0;
+                     final priceB = double.tryParse(b.price) ?? 0.0;
+                     return priceB.compareTo(priceA);
+                   });
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              return _TaskItem(task: task);
-            },
-          );
-        },
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index];
+                    return _TaskItem(task: task);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+     return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            PhosphorIcons.package(),
+            size: 64,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 16),
+          const Text('No tasks found'),
+        ],
       ),
     );
   }
