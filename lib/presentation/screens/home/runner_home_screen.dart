@@ -201,14 +201,17 @@ class _RunnerHomeScreenState extends ConsumerState<RunnerHomeScreen> {
                   padding: const EdgeInsets.all(16),
                   itemCount: 6,
                   itemBuilder: (context, index) {
-                    return const TaskCard(
+                    return const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: TaskCard(
                       title: "Loading Task Title...",
                       pickup: "Loading Location...",
                       drop: "Loading Drop...",
                       price: "...",
                       time: "...",
                       transportMode: "Walking",
-                    );
+                    ),
+                  );
                   },
                 ),
               ),
