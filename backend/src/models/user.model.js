@@ -29,6 +29,16 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    campusId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    campusName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     role: {
       type: String,
       enum: allowedRoles,

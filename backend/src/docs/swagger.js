@@ -17,6 +17,8 @@ const userSchema = {
       example: "dinesh@vitbhopal.ac.in",
     },
     phoneNumber: { type: "string", example: "+91-9876543210" },
+    campusId: { type: "string", example: "vit-bhopal" },
+    campusName: { type: "string", example: "VIT Bhopal" },
     role: { type: "string", enum: ["requester", "runner", "admin"] },
     isVerified: { type: "boolean", example: true },
     isActive: { type: "boolean", example: true },
@@ -71,6 +73,8 @@ const swaggerDocument = {
           },
           password: { type: "string", example: "strongPassword123" },
           phoneNumber: { type: "string", example: "+91-9876543210" },
+          campusId: { type: "string", example: "vit-bhopal" },
+          campusName: { type: "string", example: "VIT Bhopal" },
           role: {
             type: "string",
             enum: ["requester", "runner", "admin"],
@@ -101,6 +105,24 @@ const swaggerDocument = {
         properties: {
           fullName: { type: "string", example: "Dinesh Kumar" },
           phoneNumber: { type: "string", example: "+91-9876543210" },
+          campusId: { type: "string", example: "vit-bhopal" },
+          campusName: { type: "string", example: "VIT Bhopal" },
+        },
+      },
+      AdminUpdateProfileRequest: {
+        type: "object",
+        properties: {
+          fullName: { type: "string", example: "Dinesh Kumar" },
+          phoneNumber: { type: "string", example: "+91-9876543210" },
+          campusId: { type: "string", example: "vit-bhopal" },
+          campusName: { type: "string", example: "VIT Bhopal" },
+          role: {
+            type: "string",
+            enum: ["requester", "runner", "admin"],
+            example: "runner",
+          },
+          isVerified: { type: "boolean", example: true },
+          isActive: { type: "boolean", example: true },
         },
       },
       UpdateRoleRequest: {
@@ -112,6 +134,20 @@ const swaggerDocument = {
             enum: ["requester", "runner", "admin"],
             example: "runner",
           },
+        },
+      },
+      UpdateVerificationRequest: {
+        type: "object",
+        required: ["isVerified"],
+        properties: {
+          isVerified: { type: "boolean", example: true },
+        },
+      },
+      UpdateStatusRequest: {
+        type: "object",
+        required: ["isActive"],
+        properties: {
+          isActive: { type: "boolean", example: false },
         },
       },
       AuthResponse: apiResponse(
@@ -322,6 +358,94 @@ const swaggerDocument = {
         },
       },
     },
+    "/api/v1/profile": {
+      get: {
+        tags: ["Profile"],
+        summary: "List profiles",
+        description: "Admin-only route to list users with optional filters.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { in: "query", name: "role", schema: { type: "string" } },
+          { in: "query", name: "verified", schema: { type: "boolean" } },
+          { in: "query", name: "active", schema: { type: "boolean" } },
+          { in: "query", name: "campusId", schema: { type: "string" } },
+          { in: "query", name: "search", schema: { type: "string" } },
+        ],
+        responses: {
+          200: {
+            description: "Profiles fetched successfully",
+          },
+          403: {
+            description: "Admin only route",
+          },
+        },
+      },
+    },
+    "/api/v1/profile/{userId}": {
+      get: {
+        tags: ["Profile"],
+        summary: "Get user profile by id",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "User profile fetched successfully",
+          },
+          403: { description: "Admin only route" },
+          404: { description: "User not found" },
+        },
+      },
+      patch: {
+        tags: ["Profile"],
+        summary: "Update user profile by admin",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AdminUpdateProfileRequest" },
+            },
+          },
+        },
+        responses: {
+          200: { description: "User profile updated successfully" },
+          403: { description: "Admin only route" },
+        },
+      },
+      delete: {
+        tags: ["Profile"],
+        summary: "Soft delete user profile",
+        description: "Admin-only route that deactivates a user and clears refresh token.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: { description: "User soft deleted successfully" },
+          403: { description: "Admin only route" },
+        },
+      },
+    },
     "/api/v1/profile/{userId}/role": {
       patch: {
         tags: ["Profile"],
@@ -350,6 +474,60 @@ const swaggerDocument = {
           403: {
             description: "Admin only route",
           },
+        },
+      },
+    },
+    "/api/v1/profile/{userId}/verification": {
+      patch: {
+        tags: ["Profile"],
+        summary: "Update verification status",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateVerificationRequest" },
+            },
+          },
+        },
+        responses: {
+          200: { description: "User verification status updated successfully" },
+          403: { description: "Admin only route" },
+        },
+      },
+    },
+    "/api/v1/profile/{userId}/status": {
+      patch: {
+        tags: ["Profile"],
+        summary: "Activate or deactivate user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateStatusRequest" },
+            },
+          },
+        },
+        responses: {
+          200: { description: "User active status updated successfully" },
+          403: { description: "Admin only route" },
         },
       },
     },

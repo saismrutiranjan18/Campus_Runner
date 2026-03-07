@@ -16,6 +16,8 @@ const sanitizeUser = (user) => ({
   fullName: user.fullName,
   email: user.email,
   phoneNumber: user.phoneNumber,
+  campusId: user.campusId,
+  campusName: user.campusName,
   role: user.role,
   isVerified: user.isVerified,
   isActive: user.isActive,
@@ -40,7 +42,8 @@ const generateAccessAndRefreshTokens = async (userId) => {
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { fullName, email, password, phoneNumber, role } = req.body;
+  const { fullName, email, password, phoneNumber, campusId, campusName, role } =
+    req.body;
 
   if (!fullName || !email || !password) {
     throw new ApiError(400, "fullName, email and password are required");
@@ -62,6 +65,8 @@ const registerUser = asyncHandler(async (req, res) => {
     email: normalizedEmail,
     password,
     phoneNumber: phoneNumber?.trim() || "",
+    campusId: campusId?.trim() || "",
+    campusName: campusName?.trim() || "",
     role: role || "requester",
   });
 
