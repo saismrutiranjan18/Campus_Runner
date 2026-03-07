@@ -10,6 +10,7 @@ import '../../../logic/auth_provider.dart';
 import '../../../logic/user_provider.dart';
 import '../../../data/models/user_model.dart';
 import '../auth/login_screen.dart';
+import '../../widgets/loaders/aurora_loader.dart';
 import 'edit_profile_screen.dart';
 import '../auth/phone_verification_screen.dart';
 import 'wallet_screen.dart';
@@ -55,7 +56,10 @@ class ProfileScreen extends ConsumerWidget {
     return userProfileAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const FullScreenAuroraLoader(
+          label: 'Loading profile',
+          subtitle: 'Preparing your runner dashboard',
+        ),
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(title: const Text('Profile')),
@@ -117,6 +121,11 @@ class ProfileScreen extends ConsumerWidget {
                             backgroundImage: userProfile?.photoUrl != null
                                 ? CachedNetworkImageProvider(userProfile!.photoUrl!)
                                 : (user?.photoURL != null
+                                      ? NetworkImage(user!.photoURL!)
+                                      : null),
+                            child:
+                                userProfile?.photoUrl == null &&
+                                    user?.photoURL == null
                                     ? CachedNetworkImageProvider(user!.photoURL!)
                                     : null),
                             child: userProfile?.photoUrl == null && user?.photoURL == null
@@ -178,6 +187,37 @@ class ProfileScreen extends ConsumerWidget {
                     ).animate().fade(duration: 300.ms).slideY(begin: 0.08, end: 0),
                     const SizedBox(height: 16),
                     Row(
+                          children: [
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.checkCircle(),
+                                title: 'Completed',
+                                value: '${userProfile?.completedTasks ?? 0}',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.star(),
+                                title: 'Rating',
+                                value:
+                                    userProfile?.rating.toStringAsFixed(1) ??
+                                    '0.0',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _StatCard(
+                                icon: PhosphorIcons.users(),
+                                title: 'Reviews',
+                                value: '${userProfile?.totalRatings ?? 0}',
+                              ),
+                            ),
+                          ],
+                        )
+                        .animate()
+                        .fade(delay: 120.ms, duration: 320.ms)
+                        .slideY(begin: 0.1, end: 0),
                       children: [
                         Expanded(
                           child: _StatCard(
@@ -216,6 +256,41 @@ class ProfileScreen extends ConsumerWidget {
                     .fade(delay: 120.ms, duration: 320.ms)
                     .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
+                    Text(
+                      'Runner Performance',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: PhosphorIcons.clock(),
+                          title: 'Active',
+                          value: '0',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _StatCard(
+                          icon: PhosphorIcons.xCircle(),
+                          title: 'Cancelled',
+                          value: '0',
+                        ),
+                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _StatCard(
+                            icon: PhosphorIcons.currencyDollar(),
+                            title: 'Earnings',
+                            value: '\$${userProfile?.totalEarnings ?? 0}',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     if (userProfile != null && !userProfile.isVerified)
                       _ActionTile(
                         icon: PhosphorIcons.shieldCheck(),
