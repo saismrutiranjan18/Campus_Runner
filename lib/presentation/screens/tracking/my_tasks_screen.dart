@@ -7,11 +7,18 @@ import '../../../logic/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
 import 'live_tracking_screen.dart';
 
-class MyTasksScreen extends ConsumerWidget {
+class MyTasksScreen extends ConsumerStatefulWidget {
   const MyTasksScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyTasksScreen> createState() => _MyTasksScreenState();
+}
+
+class _MyTasksScreenState extends ConsumerState<MyTasksScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
     final currentUser = ref.watch(authRepositoryProvider).getCurrentUser();
 
     if (currentUser == null) {
@@ -27,56 +34,90 @@ class MyTasksScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Tasks'),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('tasks')
-            .where('requesterId', isEqualTo: currentUser.uid)
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    PhosphorIcons.package(),
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('No tasks yet'),
-                ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: "Search tasks...",
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
               ),
-            );
-          }
+              onChanged: (_) {
+                setState(() {});
+              },
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('tasks')
+                  .where('requesterId', isEqualTo: currentUser.uid)
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final tasks = snapshot.data!.docs
-              .map((doc) => TaskModel.fromMap(
-                    doc.data() as Map<String, dynamic>,
-                    doc.id,
-                  ))
-              .toList();
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              return _TaskItem(task: task);
-            },
-          );
-        },
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          PhosphorIcons.package(),
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('No tasks yet'),
+                      ],
+                    ),
+                  );
+                }
+
+                final tasks = snapshot.data!.docs
+                    .map((doc) => TaskModel.fromMap(
+                          doc.data() as Map<String, dynamic>,
+                          doc.id,
+                        ))
+                    .toList();
+
+                final filteredTasks = tasks.where((task) {
+                  final search = _searchController.text.toLowerCase();
+
+                  return task.title.toLowerCase().contains(search) ||
+                      task.pickup.toLowerCase().contains(search) ||
+                      task.drop.toLowerCase().contains(search);
+                }).toList();
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredTasks.length,
+                  itemBuilder: (context, index) {
+                    final task = filteredTasks[index];
+                    return _TaskItem(task: task);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }
 
@@ -97,7 +138,8 @@ class _TaskItem extends StatelessWidget {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isActive ? Colors.blue : theme.dividerColor.withValues(alpha: 0.1),
+          color:
+              isActive ? Colors.blue : theme.dividerColor.withValues(alpha: 0.1),
           width: isActive ? 2 : 1,
         ),
         boxShadow: [
