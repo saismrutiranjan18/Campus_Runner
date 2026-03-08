@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 import { User } from "../models/user.model.js";
 import {
+  allowedWalletTransactionCategories,
   WalletTransaction,
   allowedWalletTransactionStatuses,
 } from "../models/walletTransaction.model.js";
@@ -18,6 +19,10 @@ const transactionStatusTransitionMap = {
 const walletPopulateFields = [
   {
     path: "user",
+    select: "fullName email phoneNumber role isVerified isActive",
+  },
+  {
+    path: "reviewedBy",
     select: "fullName email phoneNumber role isVerified isActive",
   },
   {
@@ -48,10 +53,14 @@ const sanitizeTransaction = (transaction) => ({
   type: transaction.type,
   amount: transaction.amount,
   status: transaction.status,
+  category: transaction.category,
   description: transaction.description,
   reference: transaction.reference,
   sourceTaskId: transaction.sourceTask?._id || transaction.sourceTask || null,
   failureReason: transaction.failureReason,
+  reviewedAt: transaction.reviewedAt,
+  reviewNote: transaction.reviewNote,
+  reviewedBy: sanitizeWalletUser(transaction.reviewedBy),
   initiatedBy: sanitizeWalletUser(transaction.initiatedBy),
   createdAt: transaction.createdAt,
   updatedAt: transaction.updatedAt,
@@ -174,6 +183,8 @@ const buildWalletSummary = async (userId) => {
 
   return {
     currentBalance: summary.totalCredited - summary.totalDebited,
+    availableToWithdraw:
+      summary.totalCredited - summary.totalDebited - summary.pendingDebits,
     totalCredited: summary.totalCredited,
     totalDebited: summary.totalDebited,
     pendingCredits: summary.pendingCredits,
@@ -192,6 +203,8 @@ const createWalletTransaction = async ({
   status,
   userId,
   initiatedBy,
+  category,
+  reviewNote,
 }) => {
   await ensureUserExists(userId);
 
@@ -208,6 +221,10 @@ const createWalletTransaction = async ({
     throw new ApiError(400, "Invalid wallet transaction status provided");
   }
 
+  if (category && !allowedWalletTransactionCategories.includes(category)) {
+    throw new ApiError(400, "Invalid wallet transaction category provided");
+  }
+
   const transaction = await WalletTransaction.create({
     user: userId,
     type,
@@ -215,16 +232,59 @@ const createWalletTransaction = async ({
     description: description.trim(),
     reference: reference?.trim() || "",
     status: status || "completed",
+    category: category || "manual",
     sourceTask: null,
     initiatedBy,
     failureReason: status === "failed" ? "Marked failed at creation" : "",
+    reviewNote: reviewNote?.trim() || "",
   });
 
   return WalletTransaction.findById(transaction._id).populate(walletPopulateFields);
 };
 
+const buildWithdrawableBalance = async (userId) => {
+  const summary = await buildWalletSummary(userId);
+
+  return {
+    ...summary,
+    availableToWithdraw: Math.max(summary.availableToWithdraw, 0),
+  };
+};
+
+const ensureRunnerCanWithdraw = async (userId) => {
+  const user = await ensureUserExists(userId);
+
+  if (user.role !== "runner") {
+    throw new ApiError(403, "Only runners can submit wallet withdrawal requests");
+  }
+
+  if (!user.isActive) {
+    throw new ApiError(403, "Inactive runners cannot submit wallet withdrawal requests");
+  }
+
+  return user;
+};
+
+const fetchWithdrawalRequestOrThrow = async (transactionId) => {
+  ensureValidObjectId(transactionId, "transaction id");
+
+  const transaction = await WalletTransaction.findById(transactionId).populate(
+    walletPopulateFields,
+  );
+
+  if (!transaction) {
+    throw new ApiError(404, "Wallet withdrawal request not found");
+  }
+
+  if (transaction.category !== "withdrawal_request" || transaction.type !== "debit") {
+    throw new ApiError(400, "Transaction is not a wallet withdrawal request");
+  }
+
+  return transaction;
+};
+
 const getMyWalletBalance = asyncHandler(async (req, res) => {
-  const balance = await buildWalletSummary(req.user._id);
+  const balance = await buildWithdrawableBalance(req.user._id);
 
   res.status(200).json(
     new ApiResponse(
@@ -239,7 +299,7 @@ const getMyWalletBalance = asyncHandler(async (req, res) => {
 });
 
 const listWalletTransactions = asyncHandler(async (req, res) => {
-  const { status, type, userId, page = 1, limit = 20 } = req.query;
+  const { status, type, category, userId, page = 1, limit = 20 } = req.query;
 
   const filters = {};
   const resolvedPage = Math.max(Number(page) || 1, 1);
@@ -259,6 +319,14 @@ const listWalletTransactions = asyncHandler(async (req, res) => {
     }
 
     filters.type = type;
+  }
+
+  if (category) {
+    if (!allowedWalletTransactionCategories.includes(category)) {
+      throw new ApiError(400, "Invalid wallet transaction category filter");
+    }
+
+    filters.category = category;
   }
 
   if (req.user.role === "admin" && userId) {
@@ -288,6 +356,11 @@ const listWalletTransactions = asyncHandler(async (req, res) => {
           total,
           totalPages: Math.ceil(total / resolvedLimit) || 1,
         },
+        filters: {
+          status: status || "",
+          type: type || "",
+          category: category || "",
+        },
       },
       "Wallet transactions fetched successfully",
     ),
@@ -305,6 +378,7 @@ const createCreditTransaction = asyncHandler(async (req, res) => {
     reference,
     status,
     initiatedBy: req.user._id,
+    category: "manual",
   });
 
   res.status(201).json(
@@ -319,7 +393,7 @@ const createCreditTransaction = asyncHandler(async (req, res) => {
 const createDebitTransaction = asyncHandler(async (req, res) => {
   const { userId, amount, description, reference, status } = req.body;
 
-  const balance = await buildWalletSummary(userId);
+  const balance = await buildWithdrawableBalance(userId);
   const normalizedAmount = Number(amount);
 
   if (!status || status === "completed") {
@@ -336,6 +410,7 @@ const createDebitTransaction = asyncHandler(async (req, res) => {
     reference,
     status,
     initiatedBy: req.user._id,
+    category: "manual",
   });
 
   res.status(201).json(
@@ -343,6 +418,97 @@ const createDebitTransaction = asyncHandler(async (req, res) => {
       201,
       sanitizeTransaction(transaction),
       "Wallet debit transaction created successfully",
+    ),
+  );
+});
+
+const createWithdrawalRequest = asyncHandler(async (req, res) => {
+  const { amount, reference, reviewNote } = req.body;
+
+  await ensureRunnerCanWithdraw(req.user._id);
+
+  const normalizedAmount = Number(amount);
+  if (Number.isNaN(normalizedAmount) || normalizedAmount <= 0) {
+    throw new ApiError(400, "amount must be a positive number");
+  }
+
+  const balance = await buildWithdrawableBalance(req.user._id);
+  if (normalizedAmount > balance.availableToWithdraw) {
+    throw new ApiError(400, "Insufficient available wallet balance for withdrawal request");
+  }
+
+  const transaction = await createWalletTransaction({
+    type: "debit",
+    userId: req.user._id,
+    amount: normalizedAmount,
+    description: "Runner withdrawal request",
+    reference,
+    status: "pending",
+    initiatedBy: req.user._id,
+    category: "withdrawal_request",
+    reviewNote,
+  });
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      sanitizeTransaction(transaction),
+      "Wallet withdrawal request submitted successfully",
+    ),
+  );
+});
+
+const approveWithdrawalRequest = asyncHandler(async (req, res) => {
+  const { transactionId } = req.params;
+  const { reviewNote } = req.body;
+
+  const transaction = await fetchWithdrawalRequestOrThrow(transactionId);
+  assertStatusTransitionAllowed(transaction.status, "completed");
+
+  const balance = await buildWalletSummary(transaction.user._id);
+  if (transaction.amount > balance.currentBalance) {
+    throw new ApiError(400, "Insufficient wallet balance to approve this withdrawal request");
+  }
+
+  transaction.status = "completed";
+  transaction.failureReason = "";
+  transaction.reviewNote = reviewNote?.trim() || "Approved by admin";
+  transaction.reviewedAt = new Date();
+  transaction.reviewedBy = req.user._id;
+
+  await transaction.save();
+  await transaction.populate(walletPopulateFields);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      sanitizeTransaction(transaction),
+      "Wallet withdrawal request approved successfully",
+    ),
+  );
+});
+
+const rejectWithdrawalRequest = asyncHandler(async (req, res) => {
+  const { transactionId } = req.params;
+  const { failureReason, reviewNote } = req.body;
+
+  const transaction = await fetchWithdrawalRequestOrThrow(transactionId);
+  assertStatusTransitionAllowed(transaction.status, "failed");
+
+  transaction.status = "failed";
+  transaction.failureReason = failureReason?.trim() || "Withdrawal request rejected";
+  transaction.reviewNote = reviewNote?.trim() || transaction.failureReason;
+  transaction.reviewedAt = new Date();
+  transaction.reviewedBy = req.user._id;
+
+  await transaction.save();
+  await transaction.populate(walletPopulateFields);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      sanitizeTransaction(transaction),
+      "Wallet withdrawal request rejected successfully",
     ),
   );
 });
@@ -390,9 +556,12 @@ const updateWalletTransactionStatus = asyncHandler(async (req, res) => {
 });
 
 export {
+  approveWithdrawalRequest,
   createCreditTransaction,
   createDebitTransaction,
+  createWithdrawalRequest,
   getMyWalletBalance,
   listWalletTransactions,
+  rejectWithdrawalRequest,
   updateWalletTransactionStatus,
 };

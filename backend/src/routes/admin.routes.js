@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   archiveTask,
   getUserCampusScopes,
+  getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,
   updateReportStatus,
@@ -16,6 +17,7 @@ router.use(verifyJWT, authorizeRoles("admin"));
 
 router.get("/users/:userId/campus-scopes", getUserCampusScopes);
 router.put("/users/:userId/campus-scopes", updateUserCampusScopes);
+router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);
 router.get("/reports", listReportedIssues);

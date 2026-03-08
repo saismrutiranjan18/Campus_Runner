@@ -256,6 +256,7 @@ class TaskRepository {
     });
   }
 
+<<<<<<< HEAD
   PaginationHelper<TaskModel> createTasksPagination({
     String? campusId,
     String? status,
@@ -307,3 +308,7 @@ class TaskRepository {
     return TaskModel.fromMap(doc.data()!, doc.id);
   }
 }
+=======
+  Future<void> createTask(TaskModel newTask) async {}
+}
+>>>>>>> b96398b (local changes)

@@ -4,11 +4,15 @@ import '../../core/config/app_mode.dart';
 
 class StorageRepository {
   // Function to upload the file and return its URL
+<<<<<<< HEAD
   Future<String> uploadFile(File file, String path) async {
     if (!AppMode.backendEnabled) {
       return 'file://${file.path}';
     }
 
+=======
+  Future<String> uploadFile(File file, String path, String uid) async {
+>>>>>>> b96398b (local changes)
     try {
       final storage = FirebaseStorage.instance;
       // 1. Create a reference (storage location)
