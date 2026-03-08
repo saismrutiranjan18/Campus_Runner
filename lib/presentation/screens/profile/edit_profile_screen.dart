@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../../logic/user_provider.dart';
 import '../../../data/models/user_model.dart';
 import '../../../core/utils/validators.dart';
@@ -89,7 +91,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundImage: widget.userProfile.photoUrl != null
-                        ? NetworkImage(widget.userProfile.photoUrl!)
+                        ? CachedNetworkImageProvider(widget.userProfile.photoUrl!)
                         : null,
                     child: widget.userProfile.photoUrl == null
                         ? Icon(PhosphorIcons.user(), size: 50)
