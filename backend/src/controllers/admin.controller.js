@@ -7,9 +7,13 @@ import {
   buildRunnerMetricsMap,
   buildRunnerPerformanceEntry,
 } from "../services/runnerPerformance.service.js";
+import { WalletTransaction } from "../models/walletTransaction.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+
+const DEFAULT_ANALYTICS_DAYS = 7;
+const MAX_ANALYTICS_DAYS = 90;
 
 const reportPopulateFields = [
   {
@@ -268,6 +272,212 @@ const getRunnerPerformanceById = asyncHandler(async (req, res) => {
     runner,
     metricsByRunnerId.get(String(runner._id)),
   );
+const roundToTwoDecimals = (value) => {
+  return Math.round(value * 100) / 100;
+};
+
+const resolveAnalyticsWindow = (daysInput, now = new Date()) => {
+  const parsedDays = Number(daysInput ?? DEFAULT_ANALYTICS_DAYS);
+
+  if (!Number.isInteger(parsedDays) || parsedDays < 1 || parsedDays > MAX_ANALYTICS_DAYS) {
+    throw new ApiError(400, `days must be an integer between 1 and ${MAX_ANALYTICS_DAYS}`);
+  }
+
+  const windowEnd = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+  );
+  const windowStart = new Date(windowEnd);
+  windowStart.setUTCDate(windowStart.getUTCDate() - parsedDays);
+
+  const labels = [];
+  const cursor = new Date(windowStart);
+  while (cursor < windowEnd) {
+    labels.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return {
+    days: parsedDays,
+    start: windowStart,
+    end: windowEnd,
+    labels,
+  };
+};
+
+const mapTrendByDate = (labels, rows, valueField) => {
+  const valueByDate = new Map(rows.map((row) => [row._id, row[valueField]]));
+
+  return labels.map((date) => ({
+    date,
+    value: valueByDate.get(date) || 0,
+  }));
+};
+
+const getAdminAnalyticsDashboard = asyncHandler(async (req, res) => {
+  const analyticsWindow = resolveAnalyticsWindow(req.query.days);
+
+  const [
+    totalTasks,
+    openTasks,
+    completedTasks,
+    cancelledTasks,
+    archivedTasks,
+    activeRunners,
+    activeUsers,
+    openReports,
+    payoutTotals,
+    tasksCreatedTrendRows,
+    tasksCompletedTrendRows,
+    tasksCancelledTrendRows,
+    payoutTrendRows,
+    topCampuses,
+  ] = await Promise.all([
+    Task.countDocuments({}),
+    Task.countDocuments({ status: "open", isArchived: false }),
+    Task.countDocuments({ status: "completed" }),
+    Task.countDocuments({ status: "cancelled" }),
+    Task.countDocuments({ isArchived: true }),
+    User.countDocuments({ role: "runner", isActive: true }),
+    User.countDocuments({ isActive: true }),
+    Report.countDocuments({ status: "open" }),
+    WalletTransaction.aggregate([
+      {
+        $match: {
+          type: "credit",
+          status: "completed",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalWalletPayouts: { $sum: "$amount" },
+          payoutCount: { $sum: 1 },
+        },
+      },
+    ]),
+    Task.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: analyticsWindow.start, $lt: analyticsWindow.end },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt",
+              timezone: "UTC",
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    Task.aggregate([
+      {
+        $match: {
+          completedAt: { $gte: analyticsWindow.start, $lt: analyticsWindow.end },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$completedAt",
+              timezone: "UTC",
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    Task.aggregate([
+      {
+        $match: {
+          cancelledAt: { $gte: analyticsWindow.start, $lt: analyticsWindow.end },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$cancelledAt",
+              timezone: "UTC",
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    WalletTransaction.aggregate([
+      {
+        $match: {
+          type: "credit",
+          status: "completed",
+          createdAt: { $gte: analyticsWindow.start, $lt: analyticsWindow.end },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt",
+              timezone: "UTC",
+            },
+          },
+          totalAmount: { $sum: "$amount" },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    Task.aggregate([
+      {
+        $match: {
+          campus: { $nin: [null, ""] },
+        },
+      },
+      {
+        $group: {
+          _id: "$campus",
+          taskCount: { $sum: 1 },
+          completedCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "completed"] }, 1, 0],
+            },
+          },
+          cancelledCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0],
+            },
+          },
+          openCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "open"] }, 1, 0],
+            },
+          },
+        },
+      },
+      { $sort: { taskCount: -1, _id: 1 } },
+      { $limit: 5 },
+    ]),
+  ]);
+
+  const payoutSummary = payoutTotals[0] || {
+    totalWalletPayouts: 0,
+    payoutCount: 0,
+  };
+
+  const cancellationRate =
+    totalTasks === 0 ? 0 : roundToTwoDecimals((cancelledTasks / totalTasks) * 100);
+  const completionRate =
+    totalTasks === 0 ? 0 : roundToTwoDecimals((completedTasks / totalTasks) * 100);
 
   res.status(200).json(
     new ApiResponse(
@@ -277,6 +487,54 @@ const getRunnerPerformanceById = asyncHandler(async (req, res) => {
         metrics: runnerPerformance.metrics,
       },
       "Runner performance metrics fetched successfully",
+        window: {
+          days: analyticsWindow.days,
+          startDate: analyticsWindow.start.toISOString(),
+          endDateExclusive: analyticsWindow.end.toISOString(),
+        },
+        overview: {
+          totalTasks,
+          openTasks,
+          completedTasks,
+          cancelledTasks,
+          archivedTasks,
+          activeRunners,
+          activeUsers,
+          openReports,
+          totalWalletPayouts: payoutSummary.totalWalletPayouts,
+          payoutCount: payoutSummary.payoutCount,
+        },
+        rates: {
+          cancellationRate,
+          completionRate,
+        },
+        trends: {
+          tasksCreated: mapTrendByDate(analyticsWindow.labels, tasksCreatedTrendRows, "count"),
+          tasksCompleted: mapTrendByDate(
+            analyticsWindow.labels,
+            tasksCompletedTrendRows,
+            "count",
+          ),
+          tasksCancelled: mapTrendByDate(
+            analyticsWindow.labels,
+            tasksCancelledTrendRows,
+            "count",
+          ),
+          walletPayouts: mapTrendByDate(
+            analyticsWindow.labels,
+            payoutTrendRows,
+            "totalAmount",
+          ),
+        },
+        topCampuses: topCampuses.map((campus) => ({
+          campus: campus._id,
+          taskCount: campus.taskCount,
+          openCount: campus.openCount,
+          completedCount: campus.completedCount,
+          cancelledCount: campus.cancelledCount,
+        })),
+      },
+      "Admin analytics dashboard fetched successfully",
     ),
   );
 });
@@ -431,6 +689,7 @@ export {
   archiveTask,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
+  getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,
   updateReportStatus,

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,15 +13,28 @@ import '../../../core/config/app_mode.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../widgets/inputs/primary_button.dart';
 import '../../../core/utils/validators.dart';
+=======
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+// Project Imports
+>>>>>>> b96398b (local changes)
 import '../../../data/models/task_model.dart';
 import '../../../logic/auth_provider.dart';
 import '../../../logic/campus_provider.dart';
 import '../../../logic/task_provider.dart';
 import '../../../logic/storage_provider.dart';
+<<<<<<< HEAD
 import '../auth/login_screen.dart';
 import '../tracking/my_tasks_screen.dart';
+=======
+import '../../../logic/auth_provider.dart';
+import '../../widgets/fields/custom_text_field.dart';
+>>>>>>> b96398b (local changes)
 
-// 1. Change to ConsumerStatefulWidget
 class RequesterHomeScreen extends ConsumerStatefulWidget {
   const RequesterHomeScreen({super.key});
 
@@ -31,6 +45,7 @@ class RequesterHomeScreen extends ConsumerStatefulWidget {
 
 class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
   final _formKey = GlobalKey<FormState>();
+<<<<<<< HEAD
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
@@ -48,16 +63,29 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
   // State variables for file picker
   File? _selectedFile;
   String? _fileName;
+=======
+>>>>>>> b96398b (local changes)
 
-  bool _isUploading = false;
+  final _titleController = TextEditingController();
+  final _pickupController = TextEditingController();
+  final _dropController = TextEditingController();
+  final _priceController = TextEditingController();
+
+  bool _isLoading = false;
+
+  File? _selectedFile; 
+  String? _fileUploadError;
 
   @override
   void dispose() {
-    _itemController.dispose();
+    _titleController.dispose();
+    _pickupController.dispose();
+    _dropController.dispose();
     _priceController.dispose();
     super.dispose();
   }
 
+<<<<<<< HEAD
   Future<void> _toggleListening() async {
     if (_isListening) {
       await _speech.stop();
@@ -196,23 +224,29 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
   }
 
   // --- NEW FUNCTION: FILE PICKER ---
+=======
+  // Pick File
+>>>>>>> b96398b (local changes)
   Future<void> _pickFile() async {
-    // Only allow PDF files
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', 'doc', 'docx'],
     );
 
+<<<<<<< HEAD
     if (result != null) {
       // NOTE: We need the 'dart:io' import for the File object
       final file = File(result.files.single.path!);
+=======
+    if (result != null && result.files.single.path != null) {
+>>>>>>> b96398b (local changes)
       setState(() {
-        _selectedFile = file;
-        _fileName = result.files.single.name;
+        _selectedFile = File(result.files.single.path!);
       });
     }
   }
 
+<<<<<<< HEAD
   // THE MAIN FUNCTION: Saves data to Firebase
   void _postTask() async {
     var user = ref.read(authRepositoryProvider).getCurrentUser();
@@ -244,10 +278,42 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
 
     if (_formKey.currentState!.validate()) {
       setState(() => _isUploading = true);
+=======
+  // POST TASK
+  Future<void> _postTask() async {
+    final authRepo = ref.read(authRepositoryProvider);
+    final currentUser = authRepo.getCurrentUser();
 
-      try {
-        // --- STEP 1: UPLOAD FILE TO STORAGE ---
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please sign in to post a task.")),
+      );
+      return;
+    }
+>>>>>>> b96398b (local changes)
+
+    if (!_formKey.currentState!.validate()) return;
+
+    final price = double.tryParse(_priceController.text);
+    if (price == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid price entered.")),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _fileUploadError = null;
+    });
+
+    String? uploadedUrl;
+
+    try {
+      // FILE UPLOAD OPTIONAL
+      if (_selectedFile != null) {
         final storageRepo = ref.read(storageRepositoryProvider);
+<<<<<<< HEAD
         // Use Uuid() here to generate a secure, unique folder name
         final uniqueFileName =
             '${DateTime.now().millisecondsSinceEpoch}_$_fileName';
@@ -273,10 +339,32 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
           campusName: _selectedCampusName ?? 'Unknown Campus',
           transportMode: _selectedTransportMode ?? 'Walking',
           fileUrl: fileUrl, // PASS THE NEW URL
+=======
+        uploadedUrl = await storageRepo.uploadFile(
+          _selectedFile!,
+          "tasks",
+          currentUser.uid,
+>>>>>>> b96398b (local changes)
         );
+      }
 
-        await ref.read(taskRepositoryProvider).addTask(newTask);
+      // Create Task
+      final newTask = TaskModel(
+        id: "",
+        title: _titleController.text.trim(),
+        pickup: _pickupController.text.trim(),
+        drop: _dropController.text.trim(),
+        price: price,
+        status: "OPEN",
+        requesterId: currentUser.uid,
+        runnerId: null,
+        fileUrl: uploadedUrl,
+        createdAt: DateTime.now(),
+        acceptedAt: null,
+        completedAt: null,
+      );
 
+<<<<<<< HEAD
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -296,10 +384,41 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
         }
       } finally {
         if (mounted) setState(() => _isUploading = false);
+=======
+      await ref.read(taskRepositoryProvider).createTask(newTask);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Task Posted Successfully!")),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+
+      String error = "Error: Could not post task.";
+
+      if (_selectedFile != null &&
+          (e.toString().contains("object-not-found") ||
+              e.toString().contains("Permission"))) {
+        error = "Upload Failed: Fix Firebase Storage Rules.";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
+      );
+
+      setState(() => _fileUploadError = error);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+>>>>>>> b96398b (local changes)
       }
     }
   }
 
+  // UI
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -307,6 +426,7 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
     final campusesAsync = ref.watch(campusesStreamProvider);
 
     return Scaffold(
+<<<<<<< HEAD
       backgroundColor: colors.surface,
       appBar: AppBar(
         title: const Text("Request a Runner"),
@@ -327,6 +447,159 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
             },
             icon: Icon(PhosphorIcons.listChecks()),
             tooltip: 'My Tasks',
+=======
+      appBar: AppBar(title: const Text("Post a New Task"), elevation: 0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("What do you need?",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+
+              // Title
+              CustomTextField(
+                controller: _titleController,
+                labelText: "Task Title",
+                icon: Icon(PhosphorIcons.list()),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter title" : null,
+              ),
+              const SizedBox(height: 24),
+
+              const Text("Where & How Much?",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+
+              // Pickup
+              CustomTextField(
+                controller: _pickupController,
+                labelText: "Pickup Location",
+                icon: Icon(PhosphorIcons.mapPin()),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter pickup point" : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Drop
+              CustomTextField(
+                controller: _dropController,
+                labelText: "Drop Location",
+                icon: Icon(PhosphorIcons.truck()),
+                validator: (v) =>
+                    v == null || v.isEmpty ? "Enter drop point" : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Price
+              CustomTextField(
+                controller: _priceController,
+                labelText: "Price (₹)",
+                icon: Icon(PhosphorIcons.currencyInr()),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "Enter price";
+                  if (double.tryParse(v) == null) return "Invalid number";
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+
+              // FILE UPLOAD
+              const Text("Print File (Optional)",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+
+              GestureDetector(
+                onTap: _pickFile,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    border: Border.all(
+                      color: _selectedFile != null
+                          ? Theme.of(context).colorScheme.secondary
+                          : Colors.grey.shade400,
+                      width: 1.3,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedFile != null
+                            ? PhosphorIcons.checkCircle()
+                            : PhosphorIcons.uploadSimple(),
+                        color: _selectedFile != null
+                            ? Theme.of(context).colorScheme.secondary
+                            : Colors.grey,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedFile != null
+                              ? "Selected: ${_selectedFile!.path.split('/').last}"
+                              : "Upload PDF/DOC (Optional)",
+                          style: TextStyle(
+                            fontWeight: _selectedFile != null
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      if (_selectedFile != null)
+                        IconButton(
+                          icon: Icon(PhosphorIcons.x()),
+                          onPressed: () =>
+                              setState(() => _selectedFile = null),
+                        )
+                    ],
+                  ),
+                ),
+              ),
+
+              if (_fileUploadError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_fileUploadError!,
+                      style: const TextStyle(color: Colors.red)),
+                ),
+
+              const SizedBox(height: 32),
+
+              // POST BUTTON
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _postTask,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child:
+                              CircularProgressIndicator(color: Colors.white))
+                      : Icon(PhosphorIcons.paperPlaneRight(), size: 18),
+                  label:
+                      Text(_isLoading ? "Posting..." : "Post Task"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 40),
+            ],
+>>>>>>> b96398b (local changes)
           ),
           IconButton(
             onPressed: _toggleListening,
@@ -784,6 +1057,7 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
       ),
     );
   }
+<<<<<<< HEAD
 
   // --- HELPER FUNCTIONS ---
   InputDecoration _inputDecoration(String hint, IconData icon) {
@@ -998,4 +1272,6 @@ class _RequesterHomeScreenState extends ConsumerState<RequesterHomeScreen> {
         return PhosphorIcons.navigationArrow();
     }
   }
+=======
+>>>>>>> b96398b (local changes)
 }

@@ -19,12 +19,17 @@ class AuthResult {
 }
 
 class AuthRepository {
+<<<<<<< HEAD
   static const String allowedDomain = 'vitbhopal.ac.in';
 
+=======
+  // FIX 1: Initializing GoogleSignIn instance
+>>>>>>> b96398b (local changes)
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email'],
     hostedDomain: allowedDomain,
   );
+<<<<<<< HEAD
 
   final UserRepository _userRepository = UserRepository();
 
@@ -34,8 +39,13 @@ class AuthRepository {
         errorMessage: 'Login is disabled in demo mode.',
       );
     }
+=======
+  
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+>>>>>>> b96398b (local changes)
 
     try {
+<<<<<<< HEAD
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
@@ -95,11 +105,32 @@ class AuthRepository {
       );
     } on FirebaseAuthException catch (e) {
       return AuthResult(errorMessage: e.message ?? e.code);
+=======
+      // FIX 2: Using the initialized instance object to call signIn()
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn(); 
+
+      if (googleUser == null) {
+        return null; // User cancelled
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      // FIX 3: We rely on idToken for newer Firebase versions and set accessToken to null
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken, 
+        accessToken: null, // Set to null for maximum stability against recent Google API changes
+      );
+
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      
+      return userCredential.user;
+>>>>>>> b96398b (local changes)
     } catch (e) {
       return AuthResult(errorMessage: e.toString());
     }
   }
 
+<<<<<<< HEAD
   User? getCurrentUser() =>
       AppMode.backendEnabled ? FirebaseAuth.instance.currentUser : null;
 
@@ -110,3 +141,8 @@ class AuthRepository {
     await FirebaseAuth.instance.signOut();
   }
 }
+=======
+  // Check if a user is currently logged in
+  User? getCurrentUser() => _auth.currentUser;
+}
+>>>>>>> b96398b (local changes)

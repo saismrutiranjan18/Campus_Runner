@@ -127,6 +127,11 @@ const walletTransactionSchema = {
       enum: ["pending", "completed", "failed"],
       example: "completed",
     },
+    category: {
+      type: "string",
+      enum: ["manual", "withdrawal_request"],
+      example: "withdrawal_request",
+    },
     description: {
       type: "string",
       example: "Manual payout credit for completed campus task",
@@ -137,6 +142,13 @@ const walletTransactionSchema = {
       example: "67ca72d999ea40f2abc98765",
     },
     failureReason: { type: "string", example: "Bank transfer rejected" },
+    reviewedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    reviewNote: { type: "string", example: "Approved for payout" },
+    reviewedBy: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
     initiatedBy: {
       anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
     },
@@ -150,6 +162,7 @@ const walletBalanceSchema = {
   properties: {
     userId: { type: "string", example: "67ca72d999ea40f2abc12345" },
     currentBalance: { type: "number", example: 420 },
+    availableToWithdraw: { type: "number", example: 370 },
     totalCredited: { type: "number", example: 650 },
     totalDebited: { type: "number", example: 230 },
     pendingCredits: { type: "number", example: 100 },
@@ -507,6 +520,27 @@ const swaggerDocument = {
           },
         },
       },
+      CreateWithdrawalRequest: {
+        type: "object",
+        required: ["amount"],
+        properties: {
+          amount: { type: "number", example: 120 },
+          reference: { type: "string", example: "WD-20260308-001" },
+        },
+      },
+      ReviewWithdrawalRequest: {
+        type: "object",
+        properties: {
+          failureReason: {
+            type: "string",
+            example: "Bank account details missing",
+          },
+          reviewNote: {
+            type: "string",
+            example: "Please update payout details and resubmit",
+          },
+        },
+      },
       SuspendUserRequest: {
         type: "object",
         properties: {
@@ -653,6 +687,14 @@ const swaggerDocument = {
                 totalPages: { type: "integer", example: 1 },
               },
             },
+            filters: {
+              type: "object",
+              properties: {
+                status: { type: "string", example: "pending" },
+                type: { type: "string", example: "debit" },
+                category: { type: "string", example: "withdrawal_request" },
+              },
+            },
           },
         },
         "Wallet transactions fetched successfully",
@@ -690,6 +732,101 @@ const swaggerDocument = {
         "Reported issues fetched successfully",
       ),
       RunnerPerformanceListResponse: apiResponse(
+      AdminAnalyticsDashboardResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            window: {
+              type: "object",
+              properties: {
+                days: { type: "integer", example: 7 },
+                startDate: { type: "string", format: "date-time" },
+                endDateExclusive: { type: "string", format: "date-time" },
+              },
+            },
+            overview: {
+              type: "object",
+              properties: {
+                totalTasks: { type: "integer", example: 42 },
+                openTasks: { type: "integer", example: 8 },
+                completedTasks: { type: "integer", example: 24 },
+                cancelledTasks: { type: "integer", example: 6 },
+                archivedTasks: { type: "integer", example: 2 },
+                activeRunners: { type: "integer", example: 15 },
+                activeUsers: { type: "integer", example: 72 },
+                openReports: { type: "integer", example: 3 },
+                totalWalletPayouts: { type: "number", example: 3250 },
+                payoutCount: { type: "integer", example: 24 },
+              },
+            },
+            rates: {
+              type: "object",
+              properties: {
+                cancellationRate: { type: "number", example: 14.29 },
+                completionRate: { type: "number", example: 57.14 },
+              },
+            },
+            trends: {
+              type: "object",
+              properties: {
+                tasksCreated: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "integer", example: 4 },
+                    },
+                  },
+                },
+                tasksCompleted: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "integer", example: 2 },
+                    },
+                  },
+                },
+                tasksCancelled: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "integer", example: 1 },
+                    },
+                  },
+                },
+                walletPayouts: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "number", example: 450 },
+                    },
+                  },
+                },
+              },
+            },
+            topCampuses: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  campus: { type: "string", example: "VIT Bhopal" },
+                  taskCount: { type: "integer", example: 12 },
+                  openCount: { type: "integer", example: 3 },
+                  completedCount: { type: "integer", example: 7 },
+                  cancelledCount: { type: "integer", example: 2 },
+                },
+              },
+            },
+          },
+        },
+        "Admin analytics dashboard fetched successfully",
       DisputeResponse: apiResponse(
         { $ref: "#/components/schemas/Dispute" },
         "Dispute fetched successfully",
@@ -1545,6 +1682,11 @@ const swaggerDocument = {
           },
           {
             in: "query",
+            name: "category",
+            schema: { type: "string", enum: ["manual", "withdrawal_request"] },
+          },
+          {
+            in: "query",
             name: "userId",
             schema: { type: "string" },
           },
@@ -1567,6 +1709,39 @@ const swaggerDocument = {
                 schema: { $ref: "#/components/schemas/WalletTransactionListResponse" },
               },
             },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/withdrawals": {
+      post: {
+        tags: ["Wallet"],
+        summary: "Submit a wallet withdrawal request",
+        description:
+          "Runner-only route that creates a pending withdrawal request after validating available wallet balance against existing pending debits.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateWithdrawalRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Wallet withdrawal request submitted successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+          400: {
+            description: "Insufficient available balance or invalid request",
+          },
+          403: {
+            description: "Runner role required",
           },
         },
       },
@@ -1612,6 +1787,72 @@ const swaggerDocument = {
         responses: {
           201: {
             description: "Wallet debit transaction created successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/withdrawals/{transactionId}/approve": {
+      patch: {
+        tags: ["Wallet"],
+        summary: "Approve a wallet withdrawal request",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "transactionId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReviewWithdrawalRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Wallet withdrawal request approved successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/withdrawals/{transactionId}/reject": {
+      patch: {
+        tags: ["Wallet"],
+        summary: "Reject a wallet withdrawal request",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "transactionId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReviewWithdrawalRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Wallet withdrawal request rejected successfully",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
@@ -1673,6 +1914,34 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "User suspended successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/admin/analytics/dashboard": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get admin analytics dashboard metrics",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "days",
+            schema: { type: "integer", example: 7 },
+            description: "Number of trailing days to include in trend metrics, between 1 and 90.",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Admin analytics dashboard fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AdminAnalyticsDashboardResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Admin only route",
           },
         },
       },

@@ -4,6 +4,7 @@ import {
   archiveTask,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
+  getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,
   updateReportStatus,
@@ -16,6 +17,7 @@ router.use(verifyJWT, authorizeRoles("admin"));
 
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
+router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);
 router.get("/reports", listReportedIssues);
