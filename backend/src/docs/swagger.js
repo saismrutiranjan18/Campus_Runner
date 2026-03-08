@@ -127,6 +127,11 @@ const walletTransactionSchema = {
       enum: ["pending", "completed", "failed"],
       example: "completed",
     },
+    category: {
+      type: "string",
+      enum: ["manual", "withdrawal_request"],
+      example: "withdrawal_request",
+    },
     description: {
       type: "string",
       example: "Manual payout credit for completed campus task",
@@ -137,6 +142,13 @@ const walletTransactionSchema = {
       example: "67ca72d999ea40f2abc98765",
     },
     failureReason: { type: "string", example: "Bank transfer rejected" },
+    reviewedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    reviewNote: { type: "string", example: "Approved for payout" },
+    reviewedBy: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
     initiatedBy: {
       anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
     },
@@ -150,6 +162,7 @@ const walletBalanceSchema = {
   properties: {
     userId: { type: "string", example: "67ca72d999ea40f2abc12345" },
     currentBalance: { type: "number", example: 420 },
+    availableToWithdraw: { type: "number", example: 370 },
     totalCredited: { type: "number", example: 650 },
     totalDebited: { type: "number", example: 230 },
     pendingCredits: { type: "number", example: 100 },
@@ -466,6 +479,27 @@ const swaggerDocument = {
           },
         },
       },
+      CreateWithdrawalRequest: {
+        type: "object",
+        required: ["amount"],
+        properties: {
+          amount: { type: "number", example: 120 },
+          reference: { type: "string", example: "WD-20260308-001" },
+        },
+      },
+      ReviewWithdrawalRequest: {
+        type: "object",
+        properties: {
+          failureReason: {
+            type: "string",
+            example: "Bank account details missing",
+          },
+          reviewNote: {
+            type: "string",
+            example: "Please update payout details and resubmit",
+          },
+        },
+      },
       SuspendUserRequest: {
         type: "object",
         properties: {
@@ -610,6 +644,14 @@ const swaggerDocument = {
                 limit: { type: "integer", example: 20 },
                 total: { type: "integer", example: 8 },
                 totalPages: { type: "integer", example: 1 },
+              },
+            },
+            filters: {
+              type: "object",
+              properties: {
+                status: { type: "string", example: "pending" },
+                type: { type: "string", example: "debit" },
+                category: { type: "string", example: "withdrawal_request" },
               },
             },
           },
@@ -1560,6 +1602,11 @@ const swaggerDocument = {
           },
           {
             in: "query",
+            name: "category",
+            schema: { type: "string", enum: ["manual", "withdrawal_request"] },
+          },
+          {
+            in: "query",
             name: "userId",
             schema: { type: "string" },
           },
@@ -1582,6 +1629,39 @@ const swaggerDocument = {
                 schema: { $ref: "#/components/schemas/WalletTransactionListResponse" },
               },
             },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/withdrawals": {
+      post: {
+        tags: ["Wallet"],
+        summary: "Submit a wallet withdrawal request",
+        description:
+          "Runner-only route that creates a pending withdrawal request after validating available wallet balance against existing pending debits.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateWithdrawalRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Wallet withdrawal request submitted successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+          400: {
+            description: "Insufficient available balance or invalid request",
+          },
+          403: {
+            description: "Runner role required",
           },
         },
       },
@@ -1627,6 +1707,72 @@ const swaggerDocument = {
         responses: {
           201: {
             description: "Wallet debit transaction created successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/withdrawals/{transactionId}/approve": {
+      patch: {
+        tags: ["Wallet"],
+        summary: "Approve a wallet withdrawal request",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "transactionId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReviewWithdrawalRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Wallet withdrawal request approved successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletTransactionResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/wallet/withdrawals/{transactionId}/reject": {
+      patch: {
+        tags: ["Wallet"],
+        summary: "Reject a wallet withdrawal request",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "transactionId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReviewWithdrawalRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Wallet withdrawal request rejected successfully",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/WalletTransactionResponse" },

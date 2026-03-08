@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const allowedWalletTransactionTypes = ["credit", "debit"];
 const allowedWalletTransactionStatuses = ["pending", "completed", "failed"];
+const allowedWalletTransactionCategories = ["manual", "withdrawal_request"];
 
 const walletTransactionSchema = new mongoose.Schema(
   {
@@ -48,6 +49,26 @@ const walletTransactionSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    category: {
+      type: String,
+      enum: allowedWalletTransactionCategories,
+      default: "manual",
+      index: true,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     initiatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -61,6 +82,7 @@ const walletTransactionSchema = new mongoose.Schema(
 
 walletTransactionSchema.index({ user: 1, createdAt: -1 });
 walletTransactionSchema.index({ user: 1, status: 1, createdAt: -1 });
+walletTransactionSchema.index({ category: 1, status: 1, createdAt: -1 });
 walletTransactionSchema.index(
   { sourceTask: 1, type: 1 },
   {
@@ -78,6 +100,7 @@ const WalletTransaction = mongoose.model(
 );
 
 export {
+  allowedWalletTransactionCategories,
   WalletTransaction,
   allowedWalletTransactionStatuses,
   allowedWalletTransactionTypes,
