@@ -43,8 +43,14 @@ const createUser = async ({ fullName, email, role }) => {
     isVerified: true,
     isActive: true,
     phoneNumber: "",
-    campusId: "",
-    campusName: "",
+    campusId: "main-campus",
+    campusName: "Main Campus",
+    campusScopes: [
+      {
+        campusId: "main-campus",
+        campusName: "Main Campus",
+      },
+    ],
   });
 };
 
