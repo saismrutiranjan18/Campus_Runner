@@ -18,6 +18,7 @@ import {
   createRateLimitMiddleware,
   rateLimitPolicies,
 } from "../middlewares/rateLimit.middleware.js";
+import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.get("/users/:userId/campus-scopes", getUserCampusScopes);
 router.put(
   "/users/:userId/campus-scopes",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
+  createIdempotencyMiddleware(),
   updateUserCampusScopes,
 );
 router.get("/runners/performance", getRunnerPerformanceMetrics);
@@ -46,12 +48,19 @@ router.get("/fraud-flags", listFraudFlags);
 router.patch(
   "/fraud-flags/:flagId/status",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
+router.patch("/users/:userId/suspend", createIdempotencyMiddleware(), suspendUser);
+router.patch("/tasks/:taskId/archive", createIdempotencyMiddleware(), archiveTask);
+router.get("/fraud-flags", listFraudFlags);
+router.patch(
+  "/fraud-flags/:flagId/status",
+  createIdempotencyMiddleware(),
   updateFraudFlagStatus,
 );
 router.get("/reports", listReportedIssues);
 router.patch(
   "/reports/:reportId/status",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
+  createIdempotencyMiddleware(),
   updateReportStatus,
 );
 
