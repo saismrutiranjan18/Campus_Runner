@@ -499,6 +499,8 @@ const swaggerDocument = {
             type: "string",
             example: "Investigating requester behaviour",
           },
+        },
+      },
       RunnerPerformanceMetrics: {
         type: "object",
         properties: {
@@ -835,7 +837,66 @@ const swaggerDocument = {
         "Fraud flag status updated successfully",
       ),
       FraudFlagListResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            items: {
+              type: "array",
+              items: { $ref: "#/components/schemas/FraudFlag" },
+            },
+            pagination: {
+              type: "object",
+              properties: {
+                page: { type: "integer", example: 1 },
+                limit: { type: "integer", example: 20 },
+                total: { type: "integer", example: 4 },
+                totalPages: { type: "integer", example: 1 },
+              },
+            },
+            filters: {
+              type: "object",
+              properties: {
+                status: { type: "string", example: "open" },
+                severity: { type: "string", example: "medium" },
+                flagType: { type: "string", example: "wallet_abuse" },
+              },
+            },
+          },
+        },
+        "Fraud flags fetched successfully",
+      ),
       RunnerPerformanceListResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            items: {
+              type: "array",
+              items: { $ref: "#/components/schemas/RunnerPerformance" },
+            },
+            pagination: {
+              type: "object",
+              properties: {
+                page: { type: "integer", example: 1 },
+                limit: { type: "integer", example: 20 },
+                total: { type: "integer", example: 12 },
+                totalPages: { type: "integer", example: 1 },
+              },
+            },
+            filters: {
+              type: "object",
+              properties: {
+                search: { type: "string", example: "runner" },
+                active: { type: "string", example: "true" },
+                verified: { type: "string", example: "true" },
+                campusId: { type: "string", example: "vit-bhopal" },
+                sortBy: { type: "string", example: "totalEarnings" },
+                order: { type: "string", example: "desc" },
+              },
+            },
+          },
+        },
+        "Runner performance metrics fetched successfully",
+      ),
       AdminAnalyticsDashboardResponse: apiResponse(
         {
           type: "object",
@@ -931,6 +992,7 @@ const swaggerDocument = {
           },
         },
         "Admin analytics dashboard fetched successfully",
+      ),
       DisputeResponse: apiResponse(
         { $ref: "#/components/schemas/Dispute" },
         "Dispute fetched successfully",
@@ -941,8 +1003,6 @@ const swaggerDocument = {
           properties: {
             items: {
               type: "array",
-              items: { $ref: "#/components/schemas/FraudFlag" },
-              items: { $ref: "#/components/schemas/RunnerPerformance" },
               items: { $ref: "#/components/schemas/Dispute" },
             },
             pagination: {
@@ -950,8 +1010,6 @@ const swaggerDocument = {
               properties: {
                 page: { type: "integer", example: 1 },
                 limit: { type: "integer", example: 20 },
-                total: { type: "integer", example: 4 },
-                total: { type: "integer", example: 12 },
                 total: { type: "integer", example: 2 },
                 totalPages: { type: "integer", example: 1 },
               },
@@ -959,17 +1017,14 @@ const swaggerDocument = {
             filters: {
               type: "object",
               properties: {
-                search: { type: "string", example: "runner" },
-                active: { type: "string", example: "true" },
-                verified: { type: "string", example: "true" },
-                campusId: { type: "string", example: "vit-bhopal" },
-                sortBy: { type: "string", example: "totalEarnings" },
-                order: { type: "string", example: "desc" },
+                status: { type: "string", example: "open" },
+                openedByRole: { type: "string", example: "runner" },
+                taskId: { type: "string", example: "67ca72d999ea40f2abc98765" },
               },
             },
           },
         },
-        "Runner performance metrics fetched successfully",
+        "Disputes fetched successfully",
       ),
       RunnerPerformanceResponse: apiResponse(
         {
@@ -995,21 +1050,6 @@ const swaggerDocument = {
           },
         },
         "Runner performance metrics fetched successfully",
-                status: { type: "string", example: "open" },
-                severity: { type: "string", example: "medium" },
-                flagType: { type: "string", example: "wallet_abuse" },
-              },
-            },
-          },
-        },
-        "Fraud flags fetched successfully",
-                openedByRole: { type: "string", example: "runner" },
-                taskId: { type: "string", example: "67ca72d999ea40f2abc98765" },
-              },
-            },
-          },
-        },
-        "Disputes fetched successfully",
       ),
     },
   },
@@ -2127,17 +2167,6 @@ const swaggerDocument = {
             name: "userId",
             required: true,
             schema: { type: "string" },
-    "/api/v1/admin/analytics/dashboard": {
-      get: {
-        tags: ["Admin"],
-        summary: "Get admin analytics dashboard metrics",
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            in: "query",
-            name: "days",
-            schema: { type: "integer", example: 7 },
-            description: "Number of trailing days to include in trend metrics, between 1 and 90.",
           },
         ],
         responses: {
@@ -2179,6 +2208,25 @@ const swaggerDocument = {
                 schema: { $ref: "#/components/schemas/CampusScopesResponse" },
               },
             },
+          },
+        },
+      },
+    },
+    "/api/v1/admin/analytics/dashboard": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get admin analytics dashboard metrics",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "days",
+            schema: { type: "integer", example: 7 },
+            description: "Number of trailing days to include in trend metrics, between 1 and 90.",
+          },
+        ],
+        responses: {
+          200: {
             description: "Admin analytics dashboard fetched successfully",
             content: {
               "application/json": {
@@ -2226,12 +2274,6 @@ const swaggerDocument = {
         summary: "List fraud and anomaly detection flags",
         description:
           "Admin-only route that returns backend-generated suspicious activity flags for task cancellations, wallet abuse, self-dealing patterns, and unusually fast completions.",
-    "/api/v1/admin/runners/performance": {
-      get: {
-        tags: ["Admin"],
-        summary: "List runner performance metrics",
-        description:
-          "Admin-only route that returns backend-calculated runner metrics derived from task outcomes and completed wallet credits.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2256,6 +2298,40 @@ const swaggerDocument = {
                 "unusually_fast_completion",
               ],
             },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", example: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", example: 20 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Fraud flags fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/FraudFlagListResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/admin/runners/performance": {
+      get: {
+        tags: ["Admin"],
+        summary: "List runner performance metrics",
+        description:
+          "Admin-only route that returns backend-calculated runner metrics derived from task outcomes and completed wallet credits.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
             name: "search",
             schema: { type: "string" },
           },
@@ -2284,23 +2360,6 @@ const swaggerDocument = {
             name: "limit",
             schema: { type: "integer", example: 20 },
           },
-        ],
-        responses: {
-          200: {
-            description: "Fraud flags fetched successfully",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/FraudFlagListResponse" },
-              },
-            },
-          },
-        },
-      },
-    },
-    "/api/v1/admin/fraud-flags/{flagId}/status": {
-      patch: {
-        tags: ["Admin"],
-        summary: "Update fraud flag review status",
           {
             in: "query",
             name: "sortBy",
@@ -2338,16 +2397,15 @@ const swaggerDocument = {
         },
       },
     },
-    "/api/v1/admin/runners/{runnerId}/performance": {
-      get: {
+    "/api/v1/admin/fraud-flags/{flagId}/status": {
+      patch: {
         tags: ["Admin"],
-        summary: "Get runner performance metrics by id",
+        summary: "Update fraud flag review status",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
             in: "path",
             name: "flagId",
-            name: "runnerId",
             required: true,
             schema: { type: "string" },
           },
@@ -2369,17 +2427,30 @@ const swaggerDocument = {
               },
             },
           },
+        },
+      },
+    },
+    "/api/v1/admin/runners/{runnerId}/performance": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get runner performance metrics by id",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "runnerId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
         responses: {
           200: {
             description: "Runner performance metrics fetched successfully",
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/RunnerPerformanceResponse" },
+                schema: { $ref: "#/components/schemas/RunnerPerformanceListResponse" },
               },
             },
-          },
-          404: {
-            description: "Runner not found",
           },
         },
       },

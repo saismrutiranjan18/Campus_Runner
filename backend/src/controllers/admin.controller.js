@@ -356,6 +356,19 @@ const getRunnerPerformanceById = asyncHandler(async (req, res) => {
     runner,
     metricsByRunnerId.get(String(runner._id)),
   );
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        runner: sanitizeRunner(runner),
+        metrics: runnerPerformance.metrics,
+      },
+      "Runner performance metrics fetched successfully",
+    ),
+  );
+});
+
 const roundToTwoDecimals = (value) => {
   return Math.round(value * 100) / 100;
 };
@@ -567,10 +580,6 @@ const getAdminAnalyticsDashboard = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        runner: sanitizeRunner(runner),
-        metrics: runnerPerformance.metrics,
-      },
-      "Runner performance metrics fetched successfully",
         window: {
           days: analyticsWindow.days,
           startDate: analyticsWindow.start.toISOString(),
@@ -779,6 +788,52 @@ const getUserCampusScopes = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: sanitizeProfileUser(user),
+        campusScopes: user.campusScopes || [],
+      },
+      "User campus scopes fetched successfully",
+    ),
+  );
+});
+
+const updateUserCampusScopes = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { campusScopes } = req.body;
+
+  ensureValidObjectId(userId, "user id");
+
+  const sanitizedScopes = validateCampusScopesInput(campusScopes);
+  const user = await User.findByIdAndUpdate(
+    userId,
+    {
+      campusScopes: sanitizedScopes,
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: sanitizeProfileUser(user),
+        campusScopes: user.campusScopes || [],
+      },
+      "User campus scopes updated successfully",
+    ),
+  );
+});
+
 const listFraudFlags = asyncHandler(async (req, res) => {
   const { status, severity, flagType, page = 1, limit = 20 } = req.query;
 
@@ -823,45 +878,6 @@ const listFraudFlags = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        user: sanitizeProfileUser(user),
-        campusScopes: user.campusScopes || [],
-      },
-      "User campus scopes fetched successfully",
-    ),
-  );
-});
-
-const updateUserCampusScopes = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  const { campusScopes } = req.body;
-
-  ensureValidObjectId(userId, "user id");
-
-  const sanitizedScopes = validateCampusScopesInput(campusScopes);
-  const user = await User.findByIdAndUpdate(
-    userId,
-    {
-      campusScopes: sanitizedScopes,
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  );
-
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        user: sanitizeProfileUser(user),
-        campusScopes: user.campusScopes || [],
-      },
-      "User campus scopes updated successfully",
-    ),
         items: flags.map(sanitizeFraudFlag),
         pagination: {
           page: resolvedPage,
@@ -910,21 +926,14 @@ const updateFraudFlagStatus = asyncHandler(async (req, res) => {
 
 export {
   archiveTask,
+  getAdminAnalyticsDashboard,
+  getRunnerPerformanceById,
+  getRunnerPerformanceMetrics,
   getUserCampusScopes,
-  listReportedIssues,
-  suspendUser,
-  updateReportStatus,
-  updateUserCampusScopes,
   listFraudFlags,
   listReportedIssues,
   suspendUser,
-  updateFraudFlagStatus,
-export {
-  archiveTask,
-  getRunnerPerformanceById,
-  getRunnerPerformanceMetrics,
-  getAdminAnalyticsDashboard,
-  listReportedIssues,
-  suspendUser,
   updateReportStatus,
+  updateFraudFlagStatus,
+  updateUserCampusScopes,
 };

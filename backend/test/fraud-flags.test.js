@@ -13,12 +13,13 @@ process.env.REFRESH_TOKEN_SECRET =
 process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 process.env.MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 
-const [{ app }, { Task }, { User }, { WalletTransaction }, { FraudFlag }] = await Promise.all([
+const [{ app }, { Task }, { User }, { WalletTransaction }, { FraudFlag }, { RateLimitBucket }] = await Promise.all([
   import("../src/app.js"),
   import("../src/models/task.model.js"),
   import("../src/models/user.model.js"),
   import("../src/models/walletTransaction.model.js"),
   import("../src/models/fraudFlag.model.js"),
+  import("../src/models/rateLimitBucket.model.js"),
 ]);
 
 const createAccessToken = (user) =>
@@ -43,8 +44,14 @@ const createUser = async ({ fullName, email, role }) => {
     isVerified: true,
     isActive: true,
     phoneNumber: "",
-    campusId: "",
-    campusName: "",
+    campusId: "main-campus",
+    campusName: "Main Campus",
+    campusScopes: [
+      {
+        campusId: "main-campus",
+        campusName: "Main Campus",
+      },
+    ],
   });
 };
 
@@ -85,6 +92,7 @@ describe("fraud and anomaly detection flags", () => {
 
   beforeEach(async () => {
     await Promise.all([
+      RateLimitBucket.deleteMany({}),
       User.deleteMany({}),
       Task.deleteMany({}),
       WalletTransaction.deleteMany({}),
@@ -116,6 +124,8 @@ describe("fraud and anomaly detection flags", () => {
 
       assert.equal(cancelResponse.status, 200);
     }
+
+    await RateLimitBucket.deleteMany({});
 
     for (let index = 0; index < 3; index += 1) {
       const taskId = await createTaskForRequester(app, requesterAuth, `Completed task ${index}`);

@@ -11,6 +11,10 @@ import {
   updateWalletTransactionStatus,
 } from "../controllers/wallet.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
+import {
+  createRateLimitMiddleware,
+  rateLimitPolicies,
+} from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
@@ -18,30 +22,40 @@ router.use(verifyJWT);
 
 router.get("/balance", getMyWalletBalance);
 router.get("/transactions", listWalletTransactions);
-router.post("/withdrawals", authorizeRoles("runner"), createWithdrawalRequest);
+router.post(
+  "/withdrawals",
+  authorizeRoles("runner"),
+  createRateLimitMiddleware(rateLimitPolicies.walletChange),
+  createWithdrawalRequest,
+);
 router.patch(
   "/withdrawals/:transactionId/approve",
   authorizeRoles("admin"),
+  createRateLimitMiddleware(rateLimitPolicies.walletChange),
   approveWithdrawalRequest,
 );
 router.patch(
   "/withdrawals/:transactionId/reject",
   authorizeRoles("admin"),
+  createRateLimitMiddleware(rateLimitPolicies.walletChange),
   rejectWithdrawalRequest,
 );
 router.post(
   "/transactions/credit",
   authorizeRoles("admin"),
+  createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createCreditTransaction,
 );
 router.post(
   "/transactions/debit",
   authorizeRoles("admin"),
+  createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createDebitTransaction,
 );
 router.patch(
   "/transactions/:transactionId/status",
   authorizeRoles("admin"),
+  createRateLimitMiddleware(rateLimitPolicies.walletChange),
   updateWalletTransactionStatus,
 );
 

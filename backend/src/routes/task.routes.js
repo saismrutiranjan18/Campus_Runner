@@ -13,6 +13,10 @@ import {
   markTaskInProgress,
 } from "../controllers/task.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
+import {
+  createRateLimitMiddleware,
+  rateLimitPolicies,
+} from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
@@ -23,7 +27,12 @@ router.get("/history", authorizeRoles("requester"), listRequesterTaskHistory);
 router.get("/", listTasks);
 router.get("/open", listOpenTasks);
 router.get("/:taskId", getTaskById);
-router.post("/", authorizeRoles("requester", "admin"), createTask);
+router.post(
+  "/",
+  authorizeRoles("requester", "admin"),
+  createRateLimitMiddleware(rateLimitPolicies.taskCreate),
+  createTask,
+);
 router.patch("/:taskId/accept", authorizeRoles("runner", "admin"), acceptTask);
 router.patch(
   "/:taskId/in-progress",
@@ -31,6 +40,11 @@ router.patch(
   markTaskInProgress,
 );
 router.patch("/:taskId/complete", authorizeRoles("runner", "admin"), completeTask);
-router.patch("/:taskId/cancel", authorizeRoles("requester", "admin"), cancelTask);
+router.patch(
+  "/:taskId/cancel",
+  authorizeRoles("requester", "admin"),
+  createRateLimitMiddleware(rateLimitPolicies.taskCancel),
+  cancelTask,
+);
 
 export default router;
