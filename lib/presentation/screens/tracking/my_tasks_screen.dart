@@ -175,6 +175,12 @@ class _MyTasksScreenState extends ConsumerState<MyTasksScreen> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 }
 
 class _TaskItem extends StatelessWidget {
@@ -194,7 +200,8 @@ class _TaskItem extends StatelessWidget {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isActive ? Colors.blue : theme.dividerColor.withValues(alpha: 0.1),
+          color:
+              isActive ? Colors.blue : theme.dividerColor.withValues(alpha: 0.1),
           width: isActive ? 2 : 1,
         ),
         boxShadow: [

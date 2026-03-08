@@ -78,6 +78,23 @@ const taskSchema = {
     completedAt: {
       anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
     },
+    settlementStatus: {
+      type: "string",
+      enum: ["pending", "settled", "not_required"],
+      example: "settled",
+    },
+    settlementAmount: { type: "number", example: 80 },
+    settlementReference: {
+      type: "string",
+      example: "TASK-SETTLEMENT-67ca72d999ea40f2abc98765",
+    },
+    settlementTransactionId: {
+      anyOf: [{ type: "string" }, { type: "null" }],
+      example: "67ca72d999ea40f2abc45678",
+    },
+    settledAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
     cancelledAt: {
       anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
     },
@@ -115,6 +132,10 @@ const walletTransactionSchema = {
       example: "Manual payout credit for completed campus task",
     },
     reference: { type: "string", example: "TASK-PAYOUT-001" },
+    sourceTaskId: {
+      anyOf: [{ type: "string" }, { type: "null" }],
+      example: "67ca72d999ea40f2abc98765",
+    },
     failureReason: { type: "string", example: "Bank transfer rejected" },
     initiatedBy: {
       anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
@@ -218,6 +239,54 @@ const reportSchema = {
   },
 };
 
+const disputeSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string", example: "67ca72d999ea40f2abc77777" },
+    task: { $ref: "#/components/schemas/Task" },
+    openedBy: { $ref: "#/components/schemas/User" },
+    openedByRole: {
+      type: "string",
+      enum: ["requester", "runner"],
+      example: "requester",
+    },
+    reason: { type: "string", example: "Task marked complete with missing items" },
+    details: {
+      type: "string",
+      example: "The runner marked the task as completed but the delivered package was incomplete.",
+    },
+    evidence: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string", example: "image" },
+          label: { type: "string", example: "Delivery photo" },
+          url: { type: "string", example: "https://example.com/evidence.png" },
+          note: { type: "string", example: "Photo captured after delivery" },
+        },
+      },
+    },
+    status: {
+      type: "string",
+      enum: ["open", "under_review", "resolved", "dismissed"],
+      example: "open",
+    },
+    resolutionNote: {
+      type: "string",
+      example: "Reviewed with both parties and resolved in favor of the requester.",
+    },
+    reviewedBy: {
+      anyOf: [{ $ref: "#/components/schemas/User" }, { type: "null" }],
+    },
+    reviewedAt: {
+      anyOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+    },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+};
+
 const apiResponse = (dataSchema, messageExample = "Success") => ({
   type: "object",
   properties: {
@@ -247,6 +316,7 @@ const swaggerDocument = {
     { name: "Auth", description: "Authentication and session routes" },
     { name: "Profile", description: "Protected profile routes" },
     { name: "Tasks", description: "Protected task lifecycle routes" },
+    { name: "Disputes", description: "Task dispute creation and review routes" },
     { name: "Wallet", description: "Wallet balance and ledger routes" },
     { name: "Admin", description: "Admin moderation routes" },
   ],
@@ -259,6 +329,7 @@ const swaggerDocument = {
       WalletBalance: walletBalanceSchema,
       FraudFlag: fraudFlagSchema,
       Report: reportSchema,
+      Dispute: disputeSchema,
       RegisterRequest: {
         type: "object",
         required: ["fullName", "email", "password"],
@@ -492,6 +563,48 @@ const swaggerDocument = {
           },
         },
       },
+      CreateDisputeRequest: {
+        type: "object",
+        required: ["taskId", "reason"],
+        properties: {
+          taskId: { type: "string", example: "67ca72d999ea40f2abc98765" },
+          reason: {
+            type: "string",
+            example: "Task marked complete with missing items",
+          },
+          details: {
+            type: "string",
+            example: "Some items were not delivered even though the task was closed as completed.",
+          },
+          evidence: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                type: { type: "string", example: "image" },
+                label: { type: "string", example: "Damaged parcel photo" },
+                url: { type: "string", example: "https://example.com/dispute-proof.png" },
+                note: { type: "string", example: "Photo taken immediately after handoff" },
+              },
+            },
+          },
+        },
+      },
+      UpdateDisputeStatusRequest: {
+        type: "object",
+        required: ["status"],
+        properties: {
+          status: {
+            type: "string",
+            enum: ["under_review", "resolved", "dismissed"],
+            example: "resolved",
+          },
+          resolutionNote: {
+            type: "string",
+            example: "Reviewed the task logs and evidence, then resolved in favor of the requester.",
+          },
+        },
+      },
       AuthResponse: apiResponse(
         {
           type: "object",
@@ -604,12 +717,18 @@ const swaggerDocument = {
         "Fraud flag status updated successfully",
       ),
       FraudFlagListResponse: apiResponse(
+      DisputeResponse: apiResponse(
+        { $ref: "#/components/schemas/Dispute" },
+        "Dispute fetched successfully",
+      ),
+      DisputeListResponse: apiResponse(
         {
           type: "object",
           properties: {
             items: {
               type: "array",
               items: { $ref: "#/components/schemas/FraudFlag" },
+              items: { $ref: "#/components/schemas/Dispute" },
             },
             pagination: {
               type: "object",
@@ -617,6 +736,7 @@ const swaggerDocument = {
                 page: { type: "integer", example: 1 },
                 limit: { type: "integer", example: 20 },
                 total: { type: "integer", example: 4 },
+                total: { type: "integer", example: 2 },
                 totalPages: { type: "integer", example: 1 },
               },
             },
@@ -631,6 +751,13 @@ const swaggerDocument = {
           },
         },
         "Fraud flags fetched successfully",
+                openedByRole: { type: "string", example: "runner" },
+                taskId: { type: "string", example: "67ca72d999ea40f2abc98765" },
+              },
+            },
+          },
+        },
+        "Disputes fetched successfully",
       ),
     },
   },
@@ -1200,6 +1327,183 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "Task cancelled successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/disputes/mine": {
+      get: {
+        tags: ["Disputes"],
+        summary: "List disputes opened by the current user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["open", "under_review", "resolved", "dismissed"],
+            },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", example: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", example: 20 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Disputes fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DisputeListResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/disputes": {
+      get: {
+        tags: ["Disputes"],
+        summary: "List all disputes for admin review",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "status",
+            schema: {
+              type: "string",
+              enum: ["open", "under_review", "resolved", "dismissed"],
+            },
+          },
+          {
+            in: "query",
+            name: "openedByRole",
+            schema: {
+              type: "string",
+              enum: ["requester", "runner"],
+            },
+          },
+          {
+            in: "query",
+            name: "taskId",
+            schema: { type: "string" },
+          },
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", example: 1 },
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", example: 20 },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Disputes fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DisputeListResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Admin only route",
+          },
+        },
+      },
+      post: {
+        tags: ["Disputes"],
+        summary: "Open a dispute on a completed or cancelled task",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateDisputeRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Dispute opened successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DisputeResponse" },
+              },
+            },
+          },
+          409: {
+            description: "Task is not eligible for dispute or a duplicate dispute already exists",
+          },
+        },
+      },
+    },
+    "/api/v1/disputes/{disputeId}": {
+      get: {
+        tags: ["Disputes"],
+        summary: "Get dispute details",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "disputeId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Dispute fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DisputeResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/v1/disputes/{disputeId}/status": {
+      patch: {
+        tags: ["Disputes"],
+        summary: "Update dispute status as admin",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "disputeId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateDisputeStatusRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Dispute status updated successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DisputeResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Admin only route",
           },
         },
       },

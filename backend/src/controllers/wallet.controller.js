@@ -51,6 +51,7 @@ const sanitizeTransaction = (transaction) => ({
   status: transaction.status,
   description: transaction.description,
   reference: transaction.reference,
+  sourceTaskId: transaction.sourceTask?._id || transaction.sourceTask || null,
   failureReason: transaction.failureReason,
   initiatedBy: sanitizeWalletUser(transaction.initiatedBy),
   createdAt: transaction.createdAt,
@@ -215,6 +216,7 @@ const createWalletTransaction = async ({
     description: description.trim(),
     reference: reference?.trim() || "",
     status: status || "completed",
+    sourceTask: null,
     initiatedBy,
     failureReason: status === "failed" ? "Marked failed at creation" : "",
   });
