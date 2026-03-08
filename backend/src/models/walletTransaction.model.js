@@ -1,7 +1,13 @@
 import mongoose from "mongoose";
 
 const allowedWalletTransactionTypes = ["credit", "debit"];
-const allowedWalletTransactionStatuses = ["pending", "completed", "failed"];
+const allowedWalletTransactionStatuses = [
+  "pending",
+  "completed",
+  "failed",
+  "superseded",
+  "voided",
+];
 const allowedWalletTransactionCategories = ["manual", "withdrawal_request"];
 
 const walletTransactionSchema = new mongoose.Schema(
@@ -73,6 +79,40 @@ const walletTransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+    },
+    retrySourceTransaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
+      index: true,
+    },
+    supersededAt: {
+      type: Date,
+      default: null,
+    },
+    supersededBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    supersededByTransaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
+    },
+    voidedAt: {
+      type: Date,
+      default: null,
+    },
+    voidedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    voidReason: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   {

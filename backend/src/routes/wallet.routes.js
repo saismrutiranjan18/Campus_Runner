@@ -8,7 +8,10 @@ import {
   getMyWalletBalance,
   listWalletTransactions,
   rejectWithdrawalRequest,
+  retryFailedWithdrawalRequest,
+  supersedeFailedWithdrawalRequest,
   updateWalletTransactionStatus,
+  voidFailedWithdrawalRequest,
 } from "../controllers/wallet.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
@@ -36,6 +39,24 @@ router.patch(
   authorizeRoles("admin"),
   createIdempotencyMiddleware(),
   rejectWithdrawalRequest,
+);
+router.post(
+  "/withdrawals/:transactionId/retry",
+  authorizeRoles("admin"),
+  createIdempotencyMiddleware(),
+  retryFailedWithdrawalRequest,
+);
+router.post(
+  "/withdrawals/:transactionId/supersede",
+  authorizeRoles("admin"),
+  createIdempotencyMiddleware(),
+  supersedeFailedWithdrawalRequest,
+);
+router.patch(
+  "/withdrawals/:transactionId/void",
+  authorizeRoles("admin"),
+  createIdempotencyMiddleware(),
+  voidFailedWithdrawalRequest,
 );
 router.post(
   "/transactions/credit",

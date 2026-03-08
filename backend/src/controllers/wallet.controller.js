@@ -15,6 +15,8 @@ const transactionStatusTransitionMap = {
   pending: ["completed", "failed"],
   completed: [],
   failed: [],
+  superseded: [],
+  voided: [],
 };
 
 const walletPopulateFields = [
@@ -28,6 +30,14 @@ const walletPopulateFields = [
   },
   {
     path: "initiatedBy",
+    select: "fullName email phoneNumber role isVerified isActive",
+  },
+  {
+    path: "supersededBy",
+    select: "fullName email phoneNumber role isVerified isActive",
+  },
+  {
+    path: "voidedBy",
     select: "fullName email phoneNumber role isVerified isActive",
   },
 ];
@@ -63,6 +73,15 @@ const sanitizeTransaction = (transaction) => ({
   reviewNote: transaction.reviewNote,
   reviewedBy: sanitizeWalletUser(transaction.reviewedBy),
   initiatedBy: sanitizeWalletUser(transaction.initiatedBy),
+  retrySourceTransactionId:
+    transaction.retrySourceTransaction?._id || transaction.retrySourceTransaction || null,
+  supersededAt: transaction.supersededAt,
+  supersededBy: sanitizeWalletUser(transaction.supersededBy),
+  supersededByTransactionId:
+    transaction.supersededByTransaction?._id || transaction.supersededByTransaction || null,
+  voidedAt: transaction.voidedAt,
+  voidedBy: sanitizeWalletUser(transaction.voidedBy),
+  voidReason: transaction.voidReason,
   createdAt: transaction.createdAt,
   updatedAt: transaction.updatedAt,
 });
@@ -282,6 +301,69 @@ const fetchWithdrawalRequestOrThrow = async (transactionId) => {
   }
 
   return transaction;
+};
+
+const fetchFailedWithdrawalRequestOrThrow = async (transactionId) => {
+  const transaction = await fetchWithdrawalRequestOrThrow(transactionId);
+
+  if (transaction.status !== "failed") {
+    throw new ApiError(409, "Only failed wallet withdrawal requests can be retried, superseded, or voided");
+  }
+
+  return transaction;
+};
+
+const createReplacementWithdrawalRequest = async ({
+  sourceTransaction,
+  initiatedBy,
+  amount,
+  reference,
+  reviewNote,
+  mode,
+}) => {
+  const normalizedAmount = amount === undefined ? sourceTransaction.amount : Number(amount);
+  if (Number.isNaN(normalizedAmount) || normalizedAmount <= 0) {
+    throw new ApiError(400, "amount must be a positive number");
+  }
+
+  const balance = await buildWithdrawableBalance(sourceTransaction.user._id);
+  if (normalizedAmount > balance.availableToWithdraw) {
+    throw new ApiError(400, "Insufficient available wallet balance for payout retry");
+  }
+
+  const replacementTransaction = await WalletTransaction.create({
+    user: sourceTransaction.user._id,
+    type: "debit",
+    amount: normalizedAmount,
+    status: "pending",
+    description: sourceTransaction.description,
+    reference: reference?.trim() || sourceTransaction.reference,
+    category: "withdrawal_request",
+    initiatedBy,
+    reviewNote:
+      reviewNote?.trim() ||
+      (mode === "retry"
+        ? "Retry payout request created from failed withdrawal"
+        : "Superseding payout request created from failed withdrawal"),
+    retrySourceTransaction: sourceTransaction._id,
+    failureReason: "",
+  });
+
+  sourceTransaction.status = "superseded";
+  sourceTransaction.supersededAt = new Date();
+  sourceTransaction.supersededBy = initiatedBy;
+  sourceTransaction.supersededByTransaction = replacementTransaction._id;
+  sourceTransaction.reviewedAt = new Date();
+  sourceTransaction.reviewedBy = initiatedBy;
+  sourceTransaction.reviewNote =
+    reviewNote?.trim() ||
+    (mode === "retry"
+      ? "Failed payout was retried by admin"
+      : "Failed payout was superseded by admin");
+
+  await sourceTransaction.save();
+
+  return WalletTransaction.findById(replacementTransaction._id).populate(walletPopulateFields);
 };
 
 const getMyWalletBalance = asyncHandler(async (req, res) => {
@@ -518,6 +600,76 @@ const rejectWithdrawalRequest = asyncHandler(async (req, res) => {
   );
 });
 
+const retryFailedWithdrawalRequest = asyncHandler(async (req, res) => {
+  const { transactionId } = req.params;
+  const { reviewNote } = req.body;
+
+  const transaction = await fetchFailedWithdrawalRequestOrThrow(transactionId);
+  const replacementTransaction = await createReplacementWithdrawalRequest({
+    sourceTransaction: transaction,
+    initiatedBy: req.user._id,
+    reviewNote,
+    mode: "retry",
+  });
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      sanitizeTransaction(replacementTransaction),
+      "Failed payout retried successfully",
+    ),
+  );
+});
+
+const supersedeFailedWithdrawalRequest = asyncHandler(async (req, res) => {
+  const { transactionId } = req.params;
+  const { amount, reference, reviewNote } = req.body;
+
+  const transaction = await fetchFailedWithdrawalRequestOrThrow(transactionId);
+  const replacementTransaction = await createReplacementWithdrawalRequest({
+    sourceTransaction: transaction,
+    initiatedBy: req.user._id,
+    amount,
+    reference,
+    reviewNote,
+    mode: "supersede",
+  });
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      sanitizeTransaction(replacementTransaction),
+      "Failed payout superseded successfully",
+    ),
+  );
+});
+
+const voidFailedWithdrawalRequest = asyncHandler(async (req, res) => {
+  const { transactionId } = req.params;
+  const { voidReason, reviewNote } = req.body;
+
+  const transaction = await fetchFailedWithdrawalRequestOrThrow(transactionId);
+
+  transaction.status = "voided";
+  transaction.voidedAt = new Date();
+  transaction.voidedBy = req.user._id;
+  transaction.voidReason = voidReason?.trim() || "Failed payout voided by admin";
+  transaction.reviewedAt = new Date();
+  transaction.reviewedBy = req.user._id;
+  transaction.reviewNote = reviewNote?.trim() || transaction.voidReason;
+
+  await transaction.save();
+  await transaction.populate(walletPopulateFields);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      sanitizeTransaction(transaction),
+      "Failed payout voided successfully",
+    ),
+  );
+});
+
 const updateWalletTransactionStatus = asyncHandler(async (req, res) => {
   const { transactionId } = req.params;
   const { status, failureReason } = req.body;
@@ -569,5 +721,8 @@ export {
   getMyWalletBalance,
   listWalletTransactions,
   rejectWithdrawalRequest,
+  retryFailedWithdrawalRequest,
+  supersedeFailedWithdrawalRequest,
   updateWalletTransactionStatus,
+  voidFailedWithdrawalRequest,
 };
