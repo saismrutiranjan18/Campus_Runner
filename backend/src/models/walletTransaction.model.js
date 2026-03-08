@@ -39,6 +39,11 @@ const walletTransactionSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    sourceTask: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+      default: null,
+    },
     failureReason: {
       type: String,
       trim: true,
@@ -78,6 +83,16 @@ const walletTransactionSchema = new mongoose.Schema(
 walletTransactionSchema.index({ user: 1, createdAt: -1 });
 walletTransactionSchema.index({ user: 1, status: 1, createdAt: -1 });
 walletTransactionSchema.index({ category: 1, status: 1, createdAt: -1 });
+walletTransactionSchema.index(
+  { sourceTask: 1, type: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      sourceTask: { $type: "objectId" },
+      type: "credit",
+    },
+  },
+);
 
 const WalletTransaction = mongoose.model(
   "WalletTransaction",
