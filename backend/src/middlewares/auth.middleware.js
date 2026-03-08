@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 
+import { Session } from "../models/session.model.js";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -26,6 +27,21 @@ const verifyJWT = asyncHandler(async (req, _, next) => {
   const user = await User.findById(decodedToken?._id);
   if (!user) {
     throw new ApiError(401, "User not found for this token");
+  }
+
+  if (decodedToken?.sid) {
+    const session = await Session.findOne({
+      _id: decodedToken.sid,
+      user: user._id,
+      revokedAt: null,
+    });
+
+    if (!session) {
+      throw new ApiError(401, "Session has been revoked or no longer exists");
+    }
+
+    req.authSession = session;
+    req.authSessionId = String(session._id);
   }
 
   if (!user.isActive) {

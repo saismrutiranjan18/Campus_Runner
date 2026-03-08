@@ -111,12 +111,13 @@ userSchema.methods.isPasswordCorrect = async function isPasswordCorrect(
   return bcrypt.compare(password, this.password);
 };
 
-userSchema.methods.generateAccessToken = function generateAccessToken() {
+userSchema.methods.generateAccessToken = function generateAccessToken(options = {}) {
   return jwt.sign(
     {
       _id: this._id,
       email: this.email,
       role: this.role,
+      sid: options.sessionId || undefined,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
@@ -125,10 +126,11 @@ userSchema.methods.generateAccessToken = function generateAccessToken() {
   );
 };
 
-userSchema.methods.generateRefreshToken = function generateRefreshToken() {
+userSchema.methods.generateRefreshToken = function generateRefreshToken(options = {}) {
   return jwt.sign(
     {
       _id: this._id,
+      sid: options.sessionId || undefined,
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
