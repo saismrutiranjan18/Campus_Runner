@@ -58,6 +58,8 @@ const sanitizeTransaction = (transaction) => ({
   description: transaction.description,
   reference: transaction.reference,
   sourceTaskId: transaction.sourceTask?._id || transaction.sourceTask || null,
+  sourceDisputeId: transaction.sourceDispute?._id || transaction.sourceDispute || null,
+  linkedTransactionId: transaction.linkedTransaction?._id || transaction.linkedTransaction || null,
   failureReason: transaction.failureReason,
   reviewedAt: transaction.reviewedAt,
   reviewNote: transaction.reviewNote,

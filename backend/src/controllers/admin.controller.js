@@ -9,6 +9,7 @@ import {
 import { Report, allowedReportEntityTypes, allowedReportStatuses } from "../models/report.model.js";
 import { Task } from "../models/task.model.js";
 import { User } from "../models/user.model.js";
+import { applyTaskRefund, allowedRefundTriggerTypes } from "../services/refundLedger.service.js";
 import { sanitizeUser as sanitizeProfileUser } from "./profile.controller.js";
 import { validateCampusScopesInput } from "../utils/campusScope.js";
 import {
@@ -144,6 +145,9 @@ const sanitizeTask = (task) => {
     pickupLocation: task.pickupLocation,
     dropoffLocation: task.dropoffLocation,
     reward: task.reward,
+    refundStatus: task.refundStatus,
+    refundedAmount: task.refundedAmount,
+    refundTransactionIds: task.refundTransactions || [],
     status: task.status,
     isArchived: task.isArchived,
     archivedAt: task.archivedAt,
@@ -697,6 +701,48 @@ const archiveTask = asyncHandler(async (req, res) => {
   );
 });
 
+const refundTaskLedger = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const { amount, reason, triggerType, disputeId } = req.body;
+
+  ensureValidObjectId(taskId, "task id");
+
+  if (!allowedRefundTriggerTypes.includes(triggerType)) {
+    throw new ApiError(400, "Invalid refund triggerType provided");
+  }
+
+  if (disputeId) {
+    ensureValidObjectId(disputeId, "dispute id");
+  }
+
+  const refundResult = await applyTaskRefund({
+    taskId,
+    amount,
+    reason,
+    triggerType,
+    initiatedBy: req.user._id,
+    disputeId,
+  });
+
+  const populatedTask = await Task.findById(refundResult.task._id)
+    .populate("requestedBy", "fullName email phoneNumber role isVerified isActive")
+    .populate("assignedRunner", "fullName email phoneNumber role isVerified isActive")
+    .populate("archivedBy", "fullName email phoneNumber role isVerified isActive");
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        task: sanitizeTask(populatedTask),
+        refundAmount: refundResult.refundAmount,
+        requesterRefundTransactionId: refundResult.requesterRefund._id,
+        runnerReversalTransactionId: refundResult.runnerReversal?._id || null,
+      },
+      "Task refund applied successfully",
+    ),
+  );
+});
+
 const listReportedIssues = asyncHandler(async (req, res) => {
   const { status, entityType, page = 1, limit = 20 } = req.query;
 
@@ -932,6 +978,7 @@ export {
   getUserCampusScopes,
   listFraudFlags,
   listReportedIssues,
+  refundTaskLedger,
   suspendUser,
   updateReportStatus,
   updateFraudFlagStatus,

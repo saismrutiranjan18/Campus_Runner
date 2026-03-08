@@ -8,6 +8,7 @@ import {
   getRunnerPerformanceMetrics,
   getAdminAnalyticsDashboard,
   listReportedIssues,
+  refundTaskLedger,
   suspendUser,
   updateFraudFlagStatus,
   updateReportStatus,
@@ -31,6 +32,7 @@ router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.patch("/users/:userId/suspend", createIdempotencyMiddleware(), suspendUser);
 router.patch("/tasks/:taskId/archive", createIdempotencyMiddleware(), archiveTask);
+router.patch("/tasks/:taskId/refund", createIdempotencyMiddleware(), refundTaskLedger);
 router.get("/fraud-flags", listFraudFlags);
 router.patch(
   "/fraud-flags/:flagId/status",

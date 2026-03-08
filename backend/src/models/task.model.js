@@ -109,6 +109,30 @@ const taskSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    refundStatus: {
+      type: String,
+      enum: ["none", "partial", "full"],
+      default: "none",
+      index: true,
+    },
+    refundedAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    refundTransactions: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "WalletTransaction",
+        },
+      ],
+      default: [],
+    },
+    lastRefundedAt: {
+      type: Date,
+      default: null,
+    },
     cancelledAt: {
       type: Date,
       default: null,
