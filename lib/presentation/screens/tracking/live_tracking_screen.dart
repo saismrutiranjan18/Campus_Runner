@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../data/models/task_model.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../widgets/cards/task_timeline_widget.dart';
 
 class LiveTrackingScreen extends ConsumerStatefulWidget {
   final TaskModel task;
@@ -219,6 +220,9 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                       color: Colors.red,
                     ),
                     const SizedBox(width: 4),
+                    TaskTimelineWidget(
+                      status: widget.task.status,
+                    ),
                     Expanded(
                       child: Text(
                         widget.task.drop,

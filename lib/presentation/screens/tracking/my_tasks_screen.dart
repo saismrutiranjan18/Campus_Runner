@@ -6,6 +6,7 @@ import '../../../data/models/task_model.dart';
 import '../../../logic/auth_provider.dart';
 import '../../../core/utils/formatters.dart';
 import 'live_tracking_screen.dart';
+import '../../../data/services/notification_service.dart';
 
 class MyTasksScreen extends ConsumerStatefulWidget {
   const MyTasksScreen({super.key});
@@ -15,7 +16,16 @@ class MyTasksScreen extends ConsumerStatefulWidget {
 }
 
 class _MyTasksScreenState extends ConsumerState<MyTasksScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  String _selectedStatus = 'All';
+  String _sortOption = 'Latest';
+
+  final List<String> _statusOptions = [
+    'All',
+    'Open',
+    'In Progress',
+    'Completed',
+    'Cancelled'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -36,26 +46,60 @@ class _MyTasksScreenState extends ConsumerState<MyTasksScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: "Search tasks...",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (_) {
-                setState(() {});
-              },
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: _statusOptions.map((status) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text(status),
+                    selected: _selectedStatus == status,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedStatus = status;
+                        });
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
             ),
           ),
+          
+          // Sort Dropdown
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text('Sort by: '),
+                DropdownButton<String>(
+                  value: _sortOption,
+                  items: const [
+                    DropdownMenuItem(value: 'Latest', child: Text('Latest created')),
+                    DropdownMenuItem(value: 'Highest Price', child: Text('Highest price')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _sortOption = value;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('tasks')
                   .where('requesterId', isEqualTo: currentUser.uid)
-                  .orderBy('createdAt', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -67,48 +111,66 @@ class _MyTasksScreenState extends ConsumerState<MyTasksScreen> {
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          PhosphorIcons.package(),
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('No tasks yet'),
-                      ],
-                    ),
-                  );
+                  return _buildEmptyState();
                 }
 
-                final tasks = snapshot.data!.docs
+                var tasks = snapshot.data!.docs
                     .map((doc) => TaskModel.fromMap(
                           doc.data() as Map<String, dynamic>,
                           doc.id,
                         ))
                     .toList();
 
-                final filteredTasks = tasks.where((task) {
-                  final search = _searchController.text.toLowerCase();
+                // 1. FILTER
+                if (_selectedStatus != 'All') {
+                  final mappedStatus = _selectedStatus.toUpperCase().replaceAll(' ', '_');
+                  tasks = tasks.where((task) => task.status == mappedStatus).toList();
+                }
 
-                  return task.title.toLowerCase().contains(search) ||
-                      task.pickup.toLowerCase().contains(search) ||
-                      task.drop.toLowerCase().contains(search);
-                }).toList();
+                if (tasks.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                // 2. SORT
+                if (_sortOption == 'Latest') {
+                  tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                } else if (_sortOption == 'Highest Price') {
+                  // Ensure we parse price correctly even if it's string-based
+                   tasks.sort((a, b) {
+                     final priceA = double.tryParse(a.price) ?? 0.0;
+                     final priceB = double.tryParse(b.price) ?? 0.0;
+                     return priceB.compareTo(priceA);
+                   });
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: filteredTasks.length,
+                  itemCount: tasks.length,
                   itemBuilder: (context, index) {
-                    final task = filteredTasks[index];
+                    final task = tasks[index];
                     return _TaskItem(task: task);
                   },
                 );
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+     return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            PhosphorIcons.package(),
+            size: 64,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 16),
+          const Text('No tasks found'),
         ],
       ),
     );
