@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   archiveTask,
+  getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,
   updateReportStatus,
@@ -12,6 +13,7 @@ const router = Router();
 
 router.use(verifyJWT, authorizeRoles("admin"));
 
+router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);
 router.get("/reports", listReportedIssues);

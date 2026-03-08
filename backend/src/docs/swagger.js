@@ -648,6 +648,101 @@ const swaggerDocument = {
         },
         "Reported issues fetched successfully",
       ),
+      AdminAnalyticsDashboardResponse: apiResponse(
+        {
+          type: "object",
+          properties: {
+            window: {
+              type: "object",
+              properties: {
+                days: { type: "integer", example: 7 },
+                startDate: { type: "string", format: "date-time" },
+                endDateExclusive: { type: "string", format: "date-time" },
+              },
+            },
+            overview: {
+              type: "object",
+              properties: {
+                totalTasks: { type: "integer", example: 42 },
+                openTasks: { type: "integer", example: 8 },
+                completedTasks: { type: "integer", example: 24 },
+                cancelledTasks: { type: "integer", example: 6 },
+                archivedTasks: { type: "integer", example: 2 },
+                activeRunners: { type: "integer", example: 15 },
+                activeUsers: { type: "integer", example: 72 },
+                openReports: { type: "integer", example: 3 },
+                totalWalletPayouts: { type: "number", example: 3250 },
+                payoutCount: { type: "integer", example: 24 },
+              },
+            },
+            rates: {
+              type: "object",
+              properties: {
+                cancellationRate: { type: "number", example: 14.29 },
+                completionRate: { type: "number", example: 57.14 },
+              },
+            },
+            trends: {
+              type: "object",
+              properties: {
+                tasksCreated: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "integer", example: 4 },
+                    },
+                  },
+                },
+                tasksCompleted: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "integer", example: 2 },
+                    },
+                  },
+                },
+                tasksCancelled: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "integer", example: 1 },
+                    },
+                  },
+                },
+                walletPayouts: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", example: "2026-03-08" },
+                      value: { type: "number", example: 450 },
+                    },
+                  },
+                },
+              },
+            },
+            topCampuses: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  campus: { type: "string", example: "VIT Bhopal" },
+                  taskCount: { type: "integer", example: 12 },
+                  openCount: { type: "integer", example: 3 },
+                  completedCount: { type: "integer", example: 7 },
+                  cancelledCount: { type: "integer", example: 2 },
+                },
+              },
+            },
+          },
+        },
+        "Admin analytics dashboard fetched successfully",
       DisputeResponse: apiResponse(
         { $ref: "#/components/schemas/Dispute" },
         "Dispute fetched successfully",
@@ -1593,6 +1688,34 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "User suspended successfully",
+          },
+        },
+      },
+    },
+    "/api/v1/admin/analytics/dashboard": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get admin analytics dashboard metrics",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "days",
+            schema: { type: "integer", example: 7 },
+            description: "Number of trailing days to include in trend metrics, between 1 and 90.",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Admin analytics dashboard fetched successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AdminAnalyticsDashboardResponse" },
+              },
+            },
+          },
+          403: {
+            description: "Admin only route",
           },
         },
       },
