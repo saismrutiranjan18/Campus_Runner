@@ -13,6 +13,10 @@ import {
   updateReportStatus,
   updateUserCampusScopes,
 } from "../controllers/admin.controller.js";
+import {
+  getMaintenanceSettings,
+  updateMaintenanceSettings,
+} from "../controllers/maintenance.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
 
@@ -26,6 +30,8 @@ router.put(
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
 );
+router.get("/maintenance", getMaintenanceSettings);
+router.patch("/maintenance", createIdempotencyMiddleware(), updateMaintenanceSettings);
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);

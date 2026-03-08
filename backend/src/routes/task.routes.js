@@ -14,6 +14,7 @@ import {
 } from "../controllers/task.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
+import { createMaintenanceGateMiddleware } from "../middlewares/maintenance.middleware.js";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.get("/:taskId", getTaskById);
 router.post(
   "/",
   authorizeRoles("requester", "admin"),
+  createMaintenanceGateMiddleware("taskCreation"),
   createIdempotencyMiddleware(),
   createTask,
 );
