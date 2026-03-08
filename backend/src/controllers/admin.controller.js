@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+import {
+  FraudFlag,
+  allowedFraudFlagSeverities,
+  allowedFraudFlagStatuses,
+  allowedFraudFlagTypes,
+} from "../models/fraudFlag.model.js";
 import { Report, allowedReportEntityTypes, allowedReportStatuses } from "../models/report.model.js";
 import { Task } from "../models/task.model.js";
 import { User } from "../models/user.model.js";
@@ -46,6 +52,47 @@ const reportPopulateFields = [
         select: "fullName email phoneNumber role isVerified isActive",
       },
     ],
+  },
+];
+
+const fraudFlagPopulateFields = [
+  {
+    path: "user",
+    select: "fullName email phoneNumber role isVerified isActive",
+  },
+  {
+    path: "secondaryUser",
+    select: "fullName email phoneNumber role isVerified isActive",
+  },
+  {
+    path: "task",
+    populate: [
+      {
+        path: "requestedBy",
+        select: "fullName email phoneNumber role isVerified isActive",
+      },
+      {
+        path: "assignedRunner",
+        select: "fullName email phoneNumber role isVerified isActive",
+      },
+    ],
+  },
+  {
+    path: "walletTransaction",
+    populate: [
+      {
+        path: "user",
+        select: "fullName email phoneNumber role isVerified isActive",
+      },
+      {
+        path: "initiatedBy",
+        select: "fullName email phoneNumber role isVerified isActive",
+      },
+    ],
+  },
+  {
+    path: "reviewedBy",
+    select: "fullName email phoneNumber role isVerified isActive",
   },
 ];
 
@@ -123,6 +170,41 @@ const sanitizeReport = (report) => ({
   resolutionNote: report.resolutionNote,
   createdAt: report.createdAt,
   updatedAt: report.updatedAt,
+});
+
+const sanitizeFraudFlag = (flag) => ({
+  id: flag._id,
+  flagType: flag.flagType,
+  severity: flag.severity,
+  status: flag.status,
+  title: flag.title,
+  reason: flag.reason,
+  occurrenceCount: flag.occurrenceCount,
+  metrics: flag.metrics,
+  lastDetectedAt: flag.lastDetectedAt,
+  user: sanitizeUser(flag.user),
+  secondaryUser: sanitizeUser(flag.secondaryUser),
+  task: sanitizeTask(flag.task),
+  walletTransaction: flag.walletTransaction
+    ? {
+        id: flag.walletTransaction._id,
+        user: sanitizeUser(flag.walletTransaction.user),
+        type: flag.walletTransaction.type,
+        amount: flag.walletTransaction.amount,
+        status: flag.walletTransaction.status,
+        description: flag.walletTransaction.description,
+        reference: flag.walletTransaction.reference,
+        failureReason: flag.walletTransaction.failureReason,
+        initiatedBy: sanitizeUser(flag.walletTransaction.initiatedBy),
+        createdAt: flag.walletTransaction.createdAt,
+        updatedAt: flag.walletTransaction.updatedAt,
+      }
+    : null,
+  reviewedBy: sanitizeUser(flag.reviewedBy),
+  reviewedAt: flag.reviewedAt,
+  resolutionNote: flag.resolutionNote,
+  createdAt: flag.createdAt,
+  updatedAt: flag.updatedAt,
 });
 
 const ensureValidObjectId = (value, fieldName) => {
@@ -697,6 +779,46 @@ const getUserCampusScopes = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
+const listFraudFlags = asyncHandler(async (req, res) => {
+  const { status, severity, flagType, page = 1, limit = 20 } = req.query;
+
+  const filters = {};
+  const resolvedPage = Math.max(Number(page) || 1, 1);
+  const resolvedLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+
+  if (status) {
+    if (!allowedFraudFlagStatuses.includes(status)) {
+      throw new ApiError(400, "Invalid fraud flag status filter");
+    }
+
+    filters.status = status;
+  }
+
+  if (severity) {
+    if (!allowedFraudFlagSeverities.includes(severity)) {
+      throw new ApiError(400, "Invalid fraud flag severity filter");
+    }
+
+    filters.severity = severity;
+  }
+
+  if (flagType) {
+    if (!allowedFraudFlagTypes.includes(flagType)) {
+      throw new ApiError(400, "Invalid fraud flag type filter");
+    }
+
+    filters.flagType = flagType;
+  }
+
+  const [flags, total] = await Promise.all([
+    FraudFlag.find(filters)
+      .populate(fraudFlagPopulateFields)
+      .sort({ lastDetectedAt: -1, createdAt: -1 })
+      .skip((resolvedPage - 1) * resolvedLimit)
+      .limit(resolvedLimit),
+    FraudFlag.countDocuments(filters),
+  ]);
+
   res.status(200).json(
     new ApiResponse(
       200,
@@ -740,6 +862,49 @@ const updateUserCampusScopes = asyncHandler(async (req, res) => {
       },
       "User campus scopes updated successfully",
     ),
+        items: flags.map(sanitizeFraudFlag),
+        pagination: {
+          page: resolvedPage,
+          limit: resolvedLimit,
+          total,
+          totalPages: Math.ceil(total / resolvedLimit) || 1,
+        },
+        filters: {
+          status: status || "",
+          severity: severity || "",
+          flagType: flagType || "",
+        },
+      },
+      "Fraud flags fetched successfully",
+    ),
+  );
+});
+
+const updateFraudFlagStatus = asyncHandler(async (req, res) => {
+  const { flagId } = req.params;
+  const { status, resolutionNote } = req.body;
+
+  ensureValidObjectId(flagId, "fraud flag id");
+
+  if (!allowedFraudFlagStatuses.includes(status)) {
+    throw new ApiError(400, "Invalid fraud flag status provided");
+  }
+
+  const flag = await FraudFlag.findById(flagId).populate(fraudFlagPopulateFields);
+  if (!flag) {
+    throw new ApiError(404, "Fraud flag not found");
+  }
+
+  flag.status = status;
+  flag.reviewedBy = req.user._id;
+  flag.reviewedAt = new Date();
+  flag.resolutionNote = resolutionNote?.trim() || "";
+
+  await flag.save();
+  await flag.populate(fraudFlagPopulateFields);
+
+  res.status(200).json(
+    new ApiResponse(200, sanitizeFraudFlag(flag), "Fraud flag status updated successfully"),
   );
 });
 
@@ -750,6 +915,10 @@ export {
   suspendUser,
   updateReportStatus,
   updateUserCampusScopes,
+  listFraudFlags,
+  listReportedIssues,
+  suspendUser,
+  updateFraudFlagStatus,
 export {
   archiveTask,
   getRunnerPerformanceById,

@@ -3,11 +3,13 @@ import { Router } from "express";
 import {
   archiveTask,
   getUserCampusScopes,
+  listFraudFlags,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
   getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,
+  updateFraudFlagStatus,
   updateReportStatus,
   updateUserCampusScopes,
 } from "../controllers/admin.controller.js";
@@ -24,6 +26,8 @@ router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);
+router.get("/fraud-flags", listFraudFlags);
+router.patch("/fraud-flags/:flagId/status", updateFraudFlagStatus);
 router.get("/reports", listReportedIssues);
 router.patch("/reports/:reportId/status", updateReportStatus);
 

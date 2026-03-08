@@ -7,6 +7,7 @@ import {
   Task,
 } from "../models/task.model.js";
 import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
+import { evaluateTaskForFraudFlags } from "../services/fraudDetection.service.js";
 import { settleRunnerEarningsForTask } from "../services/taskSettlement.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -629,6 +630,8 @@ const completeTask = asyncHandler(async (req, res) => {
   task.assignmentExpiresAt = null;
 
   await task.save();
+  await task.populate(detailedTaskPopulateFields);
+  await evaluateTaskForFraudFlags(task, "completed");
   const settlementResult = await settleRunnerEarningsForTask({
     taskId: task._id,
     initiatedBy: req.user._id,
@@ -658,6 +661,7 @@ const cancelTask = asyncHandler(async (req, res) => {
 
   await task.save();
   await task.populate(detailedTaskPopulateFields);
+  await evaluateTaskForFraudFlags(task, "cancelled");
 
   res
     .status(200)
