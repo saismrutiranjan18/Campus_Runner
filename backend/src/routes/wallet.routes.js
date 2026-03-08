@@ -11,6 +11,7 @@ import {
   updateWalletTransactionStatus,
 } from "../controllers/wallet.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
+import { createCooldownMiddleware } from "../middlewares/cooldown.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
 
 const router = Router();
@@ -22,6 +23,7 @@ router.get("/transactions", listWalletTransactions);
 router.post(
   "/withdrawals",
   authorizeRoles("runner"),
+  createCooldownMiddleware({ action: "wallet_withdrawal", bypassRoles: [] }),
   createIdempotencyMiddleware(),
   createWithdrawalRequest,
 );

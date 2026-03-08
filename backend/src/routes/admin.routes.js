@@ -2,12 +2,15 @@ import { Router } from "express";
 
 import {
   archiveTask,
+  clearUserCooldown,
+  createUserCooldown,
   getUserCampusScopes,
   listFraudFlags,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
   getAdminAnalyticsDashboard,
   listReportedIssues,
+  listUserCooldowns,
   suspendUser,
   updateFraudFlagStatus,
   updateReportStatus,
@@ -25,6 +28,17 @@ router.put(
   "/users/:userId/campus-scopes",
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
+);
+router.get("/users/:userId/cooldowns", listUserCooldowns);
+router.post(
+  "/users/:userId/cooldowns",
+  createIdempotencyMiddleware(),
+  createUserCooldown,
+);
+router.patch(
+  "/users/:userId/cooldowns/:cooldownId/clear",
+  createIdempotencyMiddleware(),
+  clearUserCooldown,
 );
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);

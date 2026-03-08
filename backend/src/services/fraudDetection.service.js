@@ -1,6 +1,7 @@
 import { FraudFlag } from "../models/fraudFlag.model.js";
 import { Task } from "../models/task.model.js";
 import { WalletTransaction } from "../models/walletTransaction.model.js";
+import { syncAutomaticCooldownsForFraudFlag } from "./cooldown.service.js";
 
 const unresolvedFraudFlagStatuses = ["open", "reviewed"];
 
@@ -34,10 +35,11 @@ const recordFraudFlag = async ({
     existingFlag.occurrenceCount += 1;
 
     await existingFlag.save();
+    await syncAutomaticCooldownsForFraudFlag(existingFlag);
     return existingFlag;
   }
 
-  return FraudFlag.create({
+  const createdFlag = await FraudFlag.create({
     fingerprint,
     flagType,
     severity,
@@ -50,6 +52,10 @@ const recordFraudFlag = async ({
     walletTransaction,
     lastDetectedAt: new Date(),
   });
+
+  await syncAutomaticCooldownsForFraudFlag(createdFlag);
+
+  return createdFlag;
 };
 
 const detectRepeatedCancellation = async (task) => {
