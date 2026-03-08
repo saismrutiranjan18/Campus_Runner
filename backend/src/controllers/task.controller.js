@@ -7,6 +7,7 @@ import {
   Task,
 } from "../models/task.model.js";
 import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
+import { settleRunnerEarningsForTask } from "../services/taskSettlement.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -72,6 +73,11 @@ const sanitizeTask = (task) => ({
   assignmentExpiresAt: task.assignmentExpiresAt,
   startedAt: task.startedAt,
   completedAt: task.completedAt,
+  settlementStatus: task.settlementStatus,
+  settlementAmount: task.settlementAmount,
+  settlementReference: task.settlementReference,
+  settlementTransactionId: task.settlementTransaction?._id || task.settlementTransaction || null,
+  settledAt: task.settledAt,
   cancelledAt: task.cancelledAt,
   cancellationReason: task.cancellationReason,
   lastExpiredAt: task.lastExpiredAt,
@@ -543,11 +549,18 @@ const completeTask = asyncHandler(async (req, res) => {
   task.assignmentExpiresAt = null;
 
   await task.save();
-  await task.populate(detailedTaskPopulateFields);
+  const settlementResult = await settleRunnerEarningsForTask({
+    taskId: task._id,
+    initiatedBy: req.user._id,
+  });
+
+  const settledTask = await Task.findById(settlementResult.task._id).populate(
+    detailedTaskPopulateFields,
+  );
 
   res
     .status(200)
-    .json(new ApiResponse(200, sanitizeTask(task), "Task completed successfully"));
+    .json(new ApiResponse(200, sanitizeTask(settledTask), "Task completed successfully"));
 });
 
 const cancelTask = asyncHandler(async (req, res) => {

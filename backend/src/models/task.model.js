@@ -84,6 +84,31 @@ const taskSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    settlementStatus: {
+      type: String,
+      enum: ["pending", "settled", "not_required"],
+      default: "pending",
+      index: true,
+    },
+    settlementAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    settlementReference: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    settlementTransaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
+    },
+    settledAt: {
+      type: Date,
+      default: null,
+    },
     cancelledAt: {
       type: Date,
       default: null,
@@ -138,6 +163,7 @@ const taskSchema = new mongoose.Schema(
 
 taskSchema.index({ status: 1, createdAt: -1 });
 taskSchema.index({ status: 1, assignmentExpiresAt: 1, isArchived: 1 });
+taskSchema.index({ settlementStatus: 1, completedAt: -1 });
 taskSchema.index({ isArchived: 1, status: 1, createdAt: -1 });
 taskSchema.index({ campus: 1, status: 1, createdAt: -1 });
 taskSchema.index({ transportMode: 1, status: 1, createdAt: -1 });
