@@ -13,6 +13,14 @@ import {
   updateReportStatus,
   updateUserCampusScopes,
 } from "../controllers/admin.controller.js";
+import {
+  createCampusConfig,
+  getCampusConfigById,
+  listCampusConfigs,
+  updateCampusConfig,
+  updateCampusOperationalSettings,
+  updateCampusTransportRules,
+} from "../controllers/campusConfig.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
 
@@ -25,6 +33,20 @@ router.put(
   "/users/:userId/campus-scopes",
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
+);
+router.get("/campuses", listCampusConfigs);
+router.post("/campuses", createIdempotencyMiddleware(), createCampusConfig);
+router.get("/campuses/:campusId", getCampusConfigById);
+router.patch("/campuses/:campusId", createIdempotencyMiddleware(), updateCampusConfig);
+router.patch(
+  "/campuses/:campusId/transport-rules",
+  createIdempotencyMiddleware(),
+  updateCampusTransportRules,
+);
+router.patch(
+  "/campuses/:campusId/operational-settings",
+  createIdempotencyMiddleware(),
+  updateCampusOperationalSettings,
 );
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);

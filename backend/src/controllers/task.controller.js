@@ -6,6 +6,10 @@ import {
   allowedTransportModes,
   Task,
 } from "../models/task.model.js";
+import {
+  calculateCampusAssignmentExpiryDate,
+  resolveCampusTaskRules,
+} from "../services/campusConfig.service.js";
 import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
 import { evaluateTaskForFraudFlags } from "../services/fraudDetection.service.js";
 import { settleRunnerEarningsForTask } from "../services/taskSettlement.service.js";
@@ -427,18 +431,25 @@ const createTask = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid transport mode provided");
   }
 
-  const normalizedCampus =
+  const scopedCampus =
     req.user.role === "admin"
       ? campus.trim()
       : ensureUserHasCampusAccess(req.user, campus, "create");
+
+  const campusRuleResolution = await resolveCampusTaskRules({
+    campus: scopedCampus,
+    transportMode,
+    reward: normalizedReward,
+    action: "create",
+  });
 
   const task = await Task.create({
     title: title.trim(),
     description: description.trim(),
     pickupLocation: pickupLocation.trim(),
     dropoffLocation: dropoffLocation.trim(),
-    campus: normalizedCampus,
-    transportMode: transportMode || "other",
+    campus: campusRuleResolution.campus,
+    transportMode: campusRuleResolution.transportMode,
     reward: normalizedReward,
     requestedBy: req.user._id,
   });
@@ -562,8 +573,15 @@ const acceptTask = asyncHandler(async (req, res) => {
     ensureUserHasCampusAccess(req.user, existingTask.campus, "accept");
   }
 
+  await resolveCampusTaskRules({
+    campus: existingTask.campus,
+    transportMode: existingTask.transportMode,
+    reward: existingTask.reward,
+    action: "accept",
+  });
+
   const acceptedAt = new Date();
-  const assignmentExpiresAt = calculateAssignmentExpiryDate(acceptedAt);
+  const assignmentExpiresAt = await calculateCampusAssignmentExpiryDate(existingTask.campus);
 
   const task = await Task.findOneAndUpdate(
     {
