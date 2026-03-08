@@ -9,6 +9,10 @@ import {
 import { Report, allowedReportEntityTypes, allowedReportStatuses } from "../models/report.model.js";
 import { Task } from "../models/task.model.js";
 import { User } from "../models/user.model.js";
+import {
+  buildRunnerMetricsMap,
+  buildRunnerPerformanceEntry,
+} from "../services/runnerPerformance.service.js";
 import { WalletTransaction } from "../models/walletTransaction.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -207,6 +211,149 @@ const ensureValidObjectId = (value, fieldName) => {
   }
 };
 
+const sanitizeRunner = (runner) => ({
+  id: runner._id,
+  fullName: runner.fullName,
+  email: runner.email,
+  phoneNumber: runner.phoneNumber,
+  campusId: runner.campusId,
+  campusName: runner.campusName,
+  role: runner.role,
+  isVerified: runner.isVerified,
+  isActive: runner.isActive,
+  createdAt: runner.createdAt,
+  updatedAt: runner.updatedAt,
+});
+
+const normalizePerformanceSortValue = (entry, sortBy) => {
+  if (sortBy === "fullName") {
+    return entry.runner.fullName.toLowerCase();
+  }
+
+  return entry.metrics[sortBy] ?? 0;
+};
+
+const sortRunnerPerformanceEntries = (entries, sortBy, order) => {
+  return [...entries].sort((left, right) => {
+    const leftValue = normalizePerformanceSortValue(left, sortBy);
+    const rightValue = normalizePerformanceSortValue(right, sortBy);
+
+    if (leftValue < rightValue) {
+      return order === "asc" ? -1 : 1;
+    }
+
+    if (leftValue > rightValue) {
+      return order === "asc" ? 1 : -1;
+    }
+
+    return left.runner.fullName.localeCompare(right.runner.fullName);
+  });
+};
+
+const getRunnerPerformanceMetrics = asyncHandler(async (req, res) => {
+  const {
+    search,
+    active,
+    verified,
+    campusId,
+    page = 1,
+    limit = 20,
+    sortBy = "totalEarnings",
+    order = "desc",
+  } = req.query;
+
+  const runnerFilters = { role: "runner" };
+  const resolvedPage = Math.max(Number(page) || 1, 1);
+  const resolvedLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const allowedSortFields = [
+    "fullName",
+    "acceptedTaskCount",
+    "activeTaskCount",
+    "completedTaskCount",
+    "cancelledTaskCount",
+    "acceptanceRate",
+    "completionRate",
+    "cancellationRate",
+    "averageCompletionTimeMinutes",
+    "totalEarnings",
+  ];
+  const resolvedOrder = String(order).toLowerCase() === "asc" ? "asc" : "desc";
+
+  if (!allowedSortFields.includes(sortBy)) {
+    throw new ApiError(400, "Invalid runner performance sort field");
+  }
+
+  if (active !== undefined) {
+    runnerFilters.isActive = active === "true";
+  }
+
+  if (verified !== undefined) {
+    runnerFilters.isVerified = verified === "true";
+  }
+
+  if (campusId) {
+    runnerFilters.campusId = campusId;
+  }
+
+  if (search?.trim()) {
+    runnerFilters.$or = [
+      { fullName: { $regex: search.trim(), $options: "i" } },
+      { email: { $regex: search.trim(), $options: "i" } },
+      { phoneNumber: { $regex: search.trim(), $options: "i" } },
+    ];
+  }
+
+  const runners = await User.find(runnerFilters).sort({ createdAt: -1 });
+  const metricsByRunnerId = await buildRunnerMetricsMap(runners.map((runner) => runner._id));
+  const entries = runners.map((runner) =>
+    buildRunnerPerformanceEntry(runner, metricsByRunnerId.get(String(runner._id))),
+  );
+  const sortedEntries = sortRunnerPerformanceEntries(entries, sortBy, resolvedOrder);
+  const total = sortedEntries.length;
+  const paginatedItems = sortedEntries.slice(
+    (resolvedPage - 1) * resolvedLimit,
+    resolvedPage * resolvedLimit,
+  );
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: paginatedItems,
+        pagination: {
+          page: resolvedPage,
+          limit: resolvedLimit,
+          total,
+          totalPages: Math.ceil(total / resolvedLimit) || 1,
+        },
+        filters: {
+          search: search || "",
+          active: active ?? "",
+          verified: verified ?? "",
+          campusId: campusId || "",
+          sortBy,
+          order: resolvedOrder,
+        },
+      },
+      "Runner performance metrics fetched successfully",
+    ),
+  );
+});
+
+const getRunnerPerformanceById = asyncHandler(async (req, res) => {
+  const { runnerId } = req.params;
+  ensureValidObjectId(runnerId, "runner id");
+
+  const runner = await User.findOne({ _id: runnerId, role: "runner" });
+  if (!runner) {
+    throw new ApiError(404, "Runner not found");
+  }
+
+  const metricsByRunnerId = await buildRunnerMetricsMap([runner._id]);
+  const runnerPerformance = buildRunnerPerformanceEntry(
+    runner,
+    metricsByRunnerId.get(String(runner._id)),
+  );
 const roundToTwoDecimals = (value) => {
   return Math.round(value * 100) / 100;
 };
@@ -418,6 +565,10 @@ const getAdminAnalyticsDashboard = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
+        runner: sanitizeRunner(runner),
+        metrics: runnerPerformance.metrics,
+      },
+      "Runner performance metrics fetched successfully",
         window: {
           days: analyticsWindow.days,
           startDate: analyticsWindow.start.toISOString(),
@@ -714,6 +865,8 @@ export {
   updateFraudFlagStatus,
 export {
   archiveTask,
+  getRunnerPerformanceById,
+  getRunnerPerformanceMetrics,
   getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,

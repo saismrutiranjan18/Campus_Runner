@@ -139,6 +139,32 @@ const decodeCursor = (cursor) => {
   }
 };
 
+const parseDateFilter = (value, fieldName, boundary) => {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = String(value).trim();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(normalizedValue);
+  const parsedDate = isDateOnly
+    ? new Date(`${normalizedValue}T00:00:00.000Z`)
+    : new Date(normalizedValue);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new ApiError(400, `Invalid ${fieldName} provided`);
+  }
+
+  if (isDateOnly && boundary === "end") {
+    parsedDate.setUTCHours(23, 59, 59, 999);
+  }
+
+  return parsedDate;
+};
+
 const resolveTaskFeedQuery = (query, overrides = {}) => {
   const {
     status,
@@ -148,6 +174,8 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
     requestedBy,
     assignedRunner,
     archived,
+    fromDate,
+    toDate,
     page = 1,
     limit = 20,
     sort = "desc",
@@ -158,6 +186,8 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
   const resolvedStatus = overrides.status ?? status;
   const resolvedCampus = overrides.campus ?? campus;
   const resolvedTransportMode = overrides.transportMode ?? transportMode;
+  const resolvedRequestedBy = overrides.requestedBy ?? requestedBy;
+  const resolvedAssignedRunner = overrides.assignedRunner ?? assignedRunner;
   const resolvedArchived =
     overrides.isArchived ??
     (archived === undefined ? false : String(archived).toLowerCase() === "true");
@@ -184,14 +214,14 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
     conditions.push({ transportMode: resolvedTransportMode });
   }
 
-  if (requestedBy) {
-    ensureValidTaskId(requestedBy);
-    conditions.push({ requestedBy });
+  if (resolvedRequestedBy) {
+    ensureValidTaskId(resolvedRequestedBy);
+    conditions.push({ requestedBy: resolvedRequestedBy });
   }
 
-  if (assignedRunner) {
-    ensureValidTaskId(assignedRunner);
-    conditions.push({ assignedRunner });
+  if (resolvedAssignedRunner) {
+    ensureValidTaskId(resolvedAssignedRunner);
+    conditions.push({ assignedRunner: resolvedAssignedRunner });
   }
 
   if (search?.trim()) {
@@ -205,6 +235,27 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
         { campus: pattern },
       ],
     });
+  }
+
+  const resolvedFromDate = parseDateFilter(overrides.fromDate ?? fromDate, "fromDate", "start");
+  const resolvedToDate = parseDateFilter(overrides.toDate ?? toDate, "toDate", "end");
+
+  if (resolvedFromDate && resolvedToDate && resolvedFromDate > resolvedToDate) {
+    throw new ApiError(400, "fromDate cannot be later than toDate");
+  }
+
+  if (resolvedFromDate || resolvedToDate) {
+    const createdAtFilter = {};
+
+    if (resolvedFromDate) {
+      createdAtFilter.$gte = resolvedFromDate;
+    }
+
+    if (resolvedToDate) {
+      createdAtFilter.$lte = resolvedToDate;
+    }
+
+    conditions.push({ createdAt: createdAtFilter });
   }
 
   const resolvedSort = String(sort).toLowerCase() === "asc" ? 1 : -1;
@@ -432,6 +483,8 @@ const listTasks = asyncHandler(async (req, res) => {
           campus: req.query.campus || "",
           status: req.query.status || "",
           transportMode: req.query.transportMode || "",
+          fromDate: req.query.fromDate || "",
+          toDate: req.query.toDate || "",
           archived:
             req.query.archived === undefined
               ? false
@@ -439,6 +492,33 @@ const listTasks = asyncHandler(async (req, res) => {
         },
       },
       "Tasks fetched successfully",
+    ),
+  );
+});
+
+const listRequesterTaskHistory = asyncHandler(async (req, res) => {
+  const { items, pagination } = await fetchTaskFeed(req.query, {
+    requestedBy: req.user._id,
+  });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: items.map(sanitizeTask),
+        pagination,
+        filters: {
+          search: req.query.search || "",
+          status: req.query.status || "",
+          fromDate: req.query.fromDate || "",
+          toDate: req.query.toDate || "",
+          archived:
+            req.query.archived === undefined
+              ? false
+              : String(req.query.archived).toLowerCase() === "true",
+        },
+      },
+      "Requester task history fetched successfully",
     ),
   );
 });
@@ -581,7 +661,7 @@ const cancelTask = asyncHandler(async (req, res) => {
 const listProtectedTaskActions = asyncHandler(async (req, res) => {
   const allowedActions =
     req.user.role === "requester"
-      ? ["create-task", "list-open-tasks", "cancel-own-task"]
+      ? ["create-task", "list-open-tasks", "list-own-task-history", "cancel-own-task"]
       : req.user.role === "runner"
         ? [
             "list-open-tasks",
@@ -622,6 +702,7 @@ export {
   completeTask,
   createTask,
   getTaskById,
+  listRequesterTaskHistory,
   listTasks,
   listOpenTasks,
   listProtectedTaskActions,

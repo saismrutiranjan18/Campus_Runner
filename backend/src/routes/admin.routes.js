@@ -3,6 +3,8 @@ import { Router } from "express";
 import {
   archiveTask,
   listFraudFlags,
+  getRunnerPerformanceById,
+  getRunnerPerformanceMetrics,
   getAdminAnalyticsDashboard,
   listReportedIssues,
   suspendUser,
@@ -15,6 +17,8 @@ const router = Router();
 
 router.use(verifyJWT, authorizeRoles("admin"));
 
+router.get("/runners/performance", getRunnerPerformanceMetrics);
+router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);
