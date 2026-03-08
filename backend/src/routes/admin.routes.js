@@ -3,6 +3,8 @@ import { Router } from "express";
 import {
   archiveTask,
   getUserCampusScopes,
+  getRequesterReputationById,
+  getRequesterReputationMetrics,
   listFraudFlags,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
@@ -35,6 +37,8 @@ router.put(
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
 );
+router.get("/requesters/reputation", getRequesterReputationMetrics);
+router.get("/requesters/:requesterId/reputation", getRequesterReputationById);
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
