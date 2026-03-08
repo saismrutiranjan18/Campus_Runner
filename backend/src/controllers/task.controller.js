@@ -12,6 +12,7 @@ import {
 } from "../utils/attachmentMetadata.js";
 import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
 import { evaluateTaskForFraudFlags } from "../services/fraudDetection.service.js";
+import { awardReferralForUserIfEligible } from "../services/referral.service.js";
 import { settleRunnerEarningsForTask } from "../services/taskSettlement.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -738,6 +739,19 @@ const completeTask = asyncHandler(async (req, res) => {
     taskId: task._id,
     initiatedBy: req.user._id,
   });
+
+  await Promise.all([
+    awardReferralForUserIfEligible({
+      inviteeId: task.requestedBy?._id || task.requestedBy,
+      taskId: task._id,
+      initiatedBy: req.user._id,
+    }),
+    awardReferralForUserIfEligible({
+      inviteeId: task.assignedRunner?._id || task.assignedRunner,
+      taskId: task._id,
+      initiatedBy: req.user._id,
+    }),
+  ]);
 
   const settledTask = await Task.findById(settlementResult.task._id).populate(
     detailedTaskPopulateFields,
