@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../data/models/task_model.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../data/services/eta_service.dart';
 
 class LiveTrackingScreen extends ConsumerStatefulWidget {
   final TaskModel task;
@@ -25,6 +26,8 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
   LatLng? _dropPosition;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
+  int? _etaToPickup;
+  int? _etaToDrop;
 
   @override
   void initState() {
@@ -66,6 +69,7 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
           _runnerPosition = LatLng(lat, lon);
           _updateMarkers();
           _updatePolylines();
+          _calculateETA();
         });
 
         _mapController?.animateCamera(
@@ -154,6 +158,30 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
     }
   }
 
+  void _calculateETA() {
+    if (_runnerPosition == null) return;
+
+    if (_pickupPosition != null) {
+      final distance = ETAService.calculateDistance(
+        _runnerPosition!,
+        _pickupPosition!,
+      );
+
+      _etaToPickup =
+          ETAService.estimateMinutes(distance, widget.task.transportMode);
+    }
+
+    if (_dropPosition != null) {
+      final distance = ETAService.calculateDistance(
+        _runnerPosition!,
+        _dropPosition!,
+      );
+
+      _etaToDrop =
+          ETAService.estimateMinutes(distance, widget.task.transportMode);
+    }
+  }
+
   @override
   void dispose() {
     _taskSubscription?.cancel();
@@ -234,6 +262,20 @@ class _LiveTrackingScreenState extends ConsumerState<LiveTrackingScreen> {
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.grey,
                         ),
+                  ),
+                ],
+                if (_etaToPickup != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    "ETA to Pickup: $_etaToPickup min",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+
+                if (_etaToDrop != null) ...[
+                  Text(
+                    "ETA to Drop: $_etaToDrop min",
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ],
