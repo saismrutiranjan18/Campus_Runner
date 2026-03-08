@@ -2,17 +2,18 @@ import { Router } from "express";
 
 import {
   archiveTask,
+  getAdminAnalyticsDashboard,
   getUserCampusScopes,
-  listFraudFlags,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
-  getAdminAnalyticsDashboard,
+  listFraudFlags,
   listReportedIssues,
   suspendUser,
   updateFraudFlagStatus,
   updateReportStatus,
   updateUserCampusScopes,
 } from "../controllers/admin.controller.js";
+import { exportAdminResource } from "../controllers/adminExport.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
 
@@ -29,6 +30,9 @@ router.put(
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
+router.get("/exports/:resource", exportAdminResource);
+router.patch("/users/:userId/suspend", suspendUser);
+router.patch("/tasks/:taskId/archive", archiveTask);
 router.patch("/users/:userId/suspend", createIdempotencyMiddleware(), suspendUser);
 router.patch("/tasks/:taskId/archive", createIdempotencyMiddleware(), archiveTask);
 router.get("/fraud-flags", listFraudFlags);
