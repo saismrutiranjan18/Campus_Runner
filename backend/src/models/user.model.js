@@ -4,6 +4,87 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
 const allowedRoles = ["requester", "runner", "admin"];
+const allowedCooldownActions = [
+  "task_creation",
+  "task_cancellation",
+  "task_acceptance",
+  "wallet_withdrawal",
+];
+const allowedCooldownSourceTypes = [
+  "admin",
+  "repeated_cancellations",
+  "wallet_abuse",
+  "unusually_fast_completion",
+  "self_dealing_pattern",
+];
+
+const campusScopeSchema = new mongoose.Schema(
+  {
+    campusId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    campusName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
+const cooldownSchema = new mongoose.Schema(
+  {
+    action: {
+      type: String,
+      enum: allowedCooldownActions,
+      required: true,
+    },
+    reason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    sourceType: {
+      type: String,
+      enum: allowedCooldownSourceTypes,
+      required: true,
+    },
+    startsAt: {
+      type: Date,
+      default: Date.now,
+    },
+    endsAt: {
+      type: Date,
+      required: true,
+    },
+    triggeredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    clearedAt: {
+      type: Date,
+      default: null,
+    },
+    clearedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    clearReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+  },
+  { _id: true },
+);
 const generateInviteCode = () => crypto.randomBytes(4).toString("hex").toUpperCase();
 
 const userSchema = new mongoose.Schema(
@@ -50,23 +131,7 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
     campusScopes: {
-      type: [
-        new mongoose.Schema(
-          {
-            campusId: {
-              type: String,
-              trim: true,
-              default: "",
-            },
-            campusName: {
-              type: String,
-              trim: true,
-              default: "",
-            },
-          },
-          { _id: false },
-        ),
-      ],
+      type: [campusScopeSchema],
       default: [],
     },
     role: {
@@ -101,6 +166,9 @@ const userSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    cooldowns: {
+      type: [cooldownSchema],
+      default: [],
     restoredAt: {
       type: Date,
       default: null,
@@ -165,4 +233,4 @@ userSchema.methods.generateRefreshToken = function generateRefreshToken(options 
 
 const User = mongoose.model("User", userSchema);
 
-export { User, allowedRoles };
+export { User, allowedCooldownActions, allowedCooldownSourceTypes, allowedRoles };

@@ -15,6 +15,7 @@ import {
   voidFailedWithdrawalRequest,
 } from "../controllers/wallet.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
+import { createCooldownMiddleware } from "../middlewares/cooldown.middleware.js";
 import {
   createRateLimitMiddleware,
   rateLimitPolicies,
@@ -32,6 +33,7 @@ router.post("/promotions/claim", createIdempotencyMiddleware(), claimPromotionWa
 router.post(
   "/withdrawals",
   authorizeRoles("runner"),
+  createCooldownMiddleware({ action: "wallet_withdrawal", bypassRoles: [] }),
   createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),

@@ -16,6 +16,7 @@ import {
   removeTaskAttachment,
 } from "../controllers/task.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
+import { createCooldownMiddleware } from "../middlewares/cooldown.middleware.js";
 import {
   createRateLimitMiddleware,
   rateLimitPolicies,
@@ -38,6 +39,7 @@ router.get("/:taskId", getTaskById);
 router.post(
   "/",
   authorizeRoles("requester", "admin"),
+  createCooldownMiddleware({ action: "task_creation" }),
   createMaintenanceGateMiddleware("taskCreation"),
   createRateLimitMiddleware(rateLimitPolicies.taskCreate),
   createTask,
@@ -49,6 +51,7 @@ router.patch("/:taskId/accept", authorizeRoles("runner", "admin"), acceptTask);
 router.patch(
   "/:taskId/accept",
   authorizeRoles("runner", "admin"),
+  createCooldownMiddleware({ action: "task_acceptance" }),
   createIdempotencyMiddleware(),
   acceptTask,
 );
@@ -72,6 +75,7 @@ router.patch(
 router.patch(
   "/:taskId/cancel",
   authorizeRoles("requester", "admin"),
+  createCooldownMiddleware({ action: "task_cancellation" }),
   createIdempotencyMiddleware(),
   cancelTask,
 );

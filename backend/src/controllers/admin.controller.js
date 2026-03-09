@@ -11,11 +11,13 @@ import { Task } from "../models/task.model.js";
 import { User } from "../models/user.model.js";
 import { applyTaskRefund, allowedRefundTriggerTypes } from "../services/refundLedger.service.js";
 import { sanitizeUser as sanitizeProfileUser } from "./profile.controller.js";
+import { allowedCooldownActions } from "../models/user.model.js";
 import { validateCampusScopesInput } from "../utils/campusScope.js";
 import {
   buildRunnerMetricsMap,
   buildRunnerPerformanceEntry,
 } from "../services/runnerPerformance.service.js";
+import { applyUserCooldown, isCooldownActive } from "../services/cooldown.service.js";
 import {
   allowedRunnerIncentiveRuleTypes,
   RunnerIncentiveRule,
@@ -234,6 +236,27 @@ const sanitizeFraudFlag = (flag) => ({
   resolutionNote: flag.resolutionNote,
   createdAt: flag.createdAt,
   updatedAt: flag.updatedAt,
+});
+
+const sanitizeCooldown = (cooldown) => ({
+  id: cooldown._id,
+  action: cooldown.action,
+  reason: cooldown.reason,
+  sourceType: cooldown.sourceType,
+  startsAt: cooldown.startsAt,
+  endsAt: cooldown.endsAt,
+  isActive: isCooldownActive(cooldown),
+  triggeredBy:
+    cooldown.triggeredBy && cooldown.triggeredBy._id
+      ? sanitizeUser(cooldown.triggeredBy)
+      : cooldown.triggeredBy || null,
+  clearedAt: cooldown.clearedAt,
+  clearedBy:
+    cooldown.clearedBy && cooldown.clearedBy._id
+      ? sanitizeUser(cooldown.clearedBy)
+      : cooldown.clearedBy || null,
+  clearReason: cooldown.clearReason,
+  metadata: cooldown.metadata || {},
 });
 
 const ensureValidObjectId = (value, fieldName) => {
@@ -1422,6 +1445,153 @@ const updateUserCampusScopes = asyncHandler(async (req, res) => {
   );
 });
 
+const listUserCooldowns = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  ensureValidObjectId(userId, "user id");
+
+  const user = await User.findById(userId).populate([
+    {
+      path: "cooldowns.triggeredBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+    {
+      path: "cooldowns.clearedBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+  ]);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const cooldowns = [...(user.cooldowns || [])].sort((left, right) => right.startsAt - left.startsAt);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: sanitizeProfileUser(user),
+        activeCooldowns: cooldowns.filter((cooldown) => isCooldownActive(cooldown)).map(sanitizeCooldown),
+        cooldownHistory: cooldowns.map(sanitizeCooldown),
+      },
+      "User cooldowns fetched successfully",
+    ),
+  );
+});
+
+const createUserCooldown = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { action, reason, durationHours } = req.body;
+
+  ensureValidObjectId(userId, "user id");
+
+  if (!allowedCooldownActions.includes(action)) {
+    throw new ApiError(400, "Invalid cooldown action provided");
+  }
+
+  const parsedDurationHours = Number(durationHours);
+  if (!Number.isFinite(parsedDurationHours) || parsedDurationHours <= 0 || parsedDurationHours > 168) {
+    throw new ApiError(400, "durationHours must be a number between 1 and 168");
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const cooldown = await applyUserCooldown({
+    userId,
+    action,
+    durationHours: parsedDurationHours,
+    reason: reason?.trim() || "Manual admin cooldown applied",
+    sourceType: "admin",
+    triggeredBy: req.user._id,
+    metadata: {
+      manual: true,
+    },
+  });
+
+  await user.populate([
+    {
+      path: "cooldowns.triggeredBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+    {
+      path: "cooldowns.clearedBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+  ]);
+
+  const savedCooldown = user.cooldowns.id(cooldown._id);
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      {
+        user: sanitizeProfileUser(user),
+        cooldown: sanitizeCooldown(savedCooldown),
+      },
+      "User cooldown created successfully",
+    ),
+  );
+});
+
+const clearUserCooldown = asyncHandler(async (req, res) => {
+  const { userId, cooldownId } = req.params;
+  const { clearReason } = req.body;
+
+  ensureValidObjectId(userId, "user id");
+  ensureValidObjectId(cooldownId, "cooldown id");
+
+  const user = await User.findById(userId).populate([
+    {
+      path: "cooldowns.triggeredBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+    {
+      path: "cooldowns.clearedBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+  ]);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const cooldown = user.cooldowns.id(cooldownId);
+  if (!cooldown) {
+    throw new ApiError(404, "Cooldown not found");
+  }
+
+  cooldown.clearedAt = new Date();
+  cooldown.clearedBy = req.user._id;
+  cooldown.clearReason = clearReason?.trim() || "Cooldown cleared by admin";
+
+  await user.save({ validateBeforeSave: false });
+  await user.populate([
+    {
+      path: "cooldowns.triggeredBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+    {
+      path: "cooldowns.clearedBy",
+      select: "fullName email phoneNumber role isVerified isActive",
+    },
+  ]);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: sanitizeProfileUser(user),
+        cooldown: sanitizeCooldown(user.cooldowns.id(cooldownId)),
+      },
+      "User cooldown cleared successfully",
+    ),
+  );
+});
+
 const listFraudFlags = asyncHandler(async (req, res) => {
   const { status, severity, flagType, page = 1, limit = 20 } = req.query;
 
@@ -1514,6 +1684,8 @@ const updateFraudFlagStatus = asyncHandler(async (req, res) => {
 
 export {
   archiveTask,
+  clearUserCooldown,
+  createUserCooldown,
   createRunnerIncentiveRule,
   evaluateRunnerIncentiveRules,
   getAdminAnalyticsDashboard,
@@ -1525,6 +1697,7 @@ export {
   listRunnerIncentiveRules,
   listFraudFlags,
   listReportedIssues,
+  listUserCooldowns,
   refundTaskLedger,
   restoreTask,
   restoreUser,

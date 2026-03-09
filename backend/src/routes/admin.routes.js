@@ -2,6 +2,8 @@ import { Router } from "express";
 
 import {
   archiveTask,
+  clearUserCooldown,
+  createUserCooldown,
   createRunnerIncentiveRule,
   evaluateRunnerIncentiveRules,
   getAdminAnalyticsDashboard,
@@ -14,6 +16,7 @@ import {
   getRunnerPerformanceMetrics,
   listFraudFlags,
   listReportedIssues,
+  listUserCooldowns,
   refundTaskLedger,
   restoreTask,
   restoreUser,
@@ -58,6 +61,16 @@ router.put(
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
 );
+router.get("/users/:userId/cooldowns", listUserCooldowns);
+router.post(
+  "/users/:userId/cooldowns",
+  createIdempotencyMiddleware(),
+  createUserCooldown,
+);
+router.patch(
+  "/users/:userId/cooldowns/:cooldownId/clear",
+  createIdempotencyMiddleware(),
+  clearUserCooldown,
 router.get("/campuses", listCampusConfigs);
 router.post("/campuses", createIdempotencyMiddleware(), createCampusConfig);
 router.get("/campuses/:campusId", getCampusConfigById);
