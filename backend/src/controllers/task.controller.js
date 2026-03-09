@@ -15,6 +15,7 @@ import {
 } from "../utils/attachmentMetadata.js";
 import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
 import { evaluateTaskForFraudFlags } from "../services/fraudDetection.service.js";
+import { validateTaskPromotion, recordTaskPromotionRedemption } from "../services/promotion.service.js";
 import { awardReferralForUserIfEligible } from "../services/referral.service.js";
 import { settleRunnerEarningsForTask } from "../services/taskSettlement.service.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -77,8 +78,10 @@ const sanitizeTask = (task) => ({
   pickupLocation: task.pickupLocation,
   dropoffLocation: task.dropoffLocation,
   campus: task.campus,
+  campusZone: task.campusZone,
   transportMode: task.transportMode,
   reward: task.reward,
+  promotionSnapshot: task.promotionSnapshot,
   status: task.status,
   requestedBy: sanitizeTaskUser(task.requestedBy),
   assignedRunner: sanitizeTaskUser(task.assignedRunner),
@@ -249,6 +252,7 @@ const resolveTaskFeedQuery = (query, overrides = {}) => {
         { pickupLocation: pattern },
         { dropoffLocation: pattern },
         { campus: pattern },
+        { campusZone: pattern },
       ],
     });
   }
@@ -415,6 +419,49 @@ const ensureTaskRequesterOrAdmin = (task, user) => {
   }
 };
 
+const previewTaskQuote = asyncHandler(async (req, res) => {
+  const { campus, reward, promoCode } = req.body;
+
+  if (!campus) {
+    throw new ApiError(400, "campus is required");
+  }
+
+  const normalizedReward = Number(reward);
+  if (Number.isNaN(normalizedReward) || normalizedReward < 0) {
+    throw new ApiError(400, "reward must be a non-negative number");
+  }
+
+  const normalizedCampus =
+    req.user.role === "admin"
+      ? campus.trim()
+      : ensureUserHasCampusAccess(req.user, campus, "preview quote");
+
+  const promotionValidation = await validateTaskPromotion({
+    code: promoCode,
+    userId: req.user._id,
+    campus: normalizedCampus,
+    reward: normalizedReward,
+  });
+
+  const finalReward = promotionValidation ? promotionValidation.finalReward : normalizedReward;
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        campus: normalizedCampus,
+        subtotal: normalizedReward,
+        promotion: promotionValidation
+          ? {
+              code: promotionValidation.promotion.code,
+              discountAmount: promotionValidation.discountAmount,
+              finalReward: promotionValidation.finalReward,
+              snapshot: promotionValidation.snapshot,
+            }
+          : null,
+        total: finalReward,
+      },
+      "Task quote preview fetched successfully",
 const ensureTaskParticipantOrAdmin = (task, user) => {
   if (user.role === "admin") {
     return;
@@ -513,7 +560,9 @@ const createTask = asyncHandler(async (req, res) => {
     pickupLocation,
     dropoffLocation,
     campus,
+    campusZone,
     transportMode,
+    promoCode,
     reward,
   } = req.body;
 
@@ -543,6 +592,11 @@ const createTask = asyncHandler(async (req, res) => {
     transportMode,
     reward: normalizedReward,
     action: "create",
+  const promotionValidation = await validateTaskPromotion({
+    code: promoCode,
+    userId: req.user._id,
+    campus: normalizedCampus,
+    reward: normalizedReward,
   });
 
   const task = await Task.create({
@@ -553,8 +607,21 @@ const createTask = asyncHandler(async (req, res) => {
     campus: campusRuleResolution.campus,
     transportMode: campusRuleResolution.transportMode,
     reward: normalizedReward,
+    campus: normalizedCampus,
+    campusZone: campusZone?.trim() || "",
+    transportMode: transportMode || "other",
+    reward: promotionValidation ? promotionValidation.finalReward : normalizedReward,
+    promotionSnapshot: promotionValidation ? promotionValidation.snapshot : null,
     requestedBy: req.user._id,
   });
+
+  if (promotionValidation) {
+    await recordTaskPromotionRedemption({
+      promotionValidation,
+      userId: req.user._id,
+      taskId: task._id,
+    });
+  }
 
   const createdTask = await Task.findById(task._id).populate(detailedTaskPopulateFields);
 
@@ -851,5 +918,6 @@ export {
   listOpenTasks,
   listProtectedTaskActions,
   markTaskInProgress,
+  previewTaskQuote,
   removeTaskAttachment,
 };

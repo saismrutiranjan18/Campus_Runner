@@ -2,16 +2,22 @@ import { Router } from "express";
 
 import {
   archiveTask,
+  createRunnerIncentiveRule,
+  evaluateRunnerIncentiveRules,
   getAdminAnalyticsDashboard,
   getUserCampusScopes,
   getRequesterReputationById,
   getRequesterReputationMetrics,
   listFraudFlags,
+  listRunnerIncentiveRules,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
   listFraudFlags,
   listReportedIssues,
+  restoreTask,
+  restoreUser,
   suspendUser,
+  updateRunnerIncentiveRule,
   updateFraudFlagStatus,
   updateReportStatus,
   updateUserCampusScopes,
@@ -24,6 +30,7 @@ import {
   updateCampusOperationalSettings,
   updateCampusTransportRules,
 } from "../controllers/campusConfig.controller.js";
+import { createPromotion, listPromotions, updatePromotion } from "../controllers/promotion.controller.js";
 import { exportAdminResource } from "../controllers/adminExport.controller.js";
 import {
   addReportAttachment,
@@ -61,11 +68,34 @@ router.patch(
   createIdempotencyMiddleware(),
   updateCampusOperationalSettings,
 );
+router.get("/promotions", listPromotions);
+router.post("/promotions", createIdempotencyMiddleware(), createPromotion);
+router.patch("/promotions/:promotionId", createIdempotencyMiddleware(), updatePromotion);
 router.get("/requesters/reputation", getRequesterReputationMetrics);
 router.get("/requesters/:requesterId/reputation", getRequesterReputationById);
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
+router.get("/runner-incentives/rules", listRunnerIncentiveRules);
+router.post(
+  "/runner-incentives/rules",
+  createIdempotencyMiddleware(),
+  createRunnerIncentiveRule,
+);
+router.patch(
+  "/runner-incentives/rules/:ruleId",
+  createIdempotencyMiddleware(),
+  updateRunnerIncentiveRule,
+);
+router.post(
+  "/runner-incentives/evaluate",
+  createIdempotencyMiddleware(),
+  evaluateRunnerIncentiveRules,
+);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
+router.patch("/users/:userId/suspend", suspendUser);
+router.patch("/users/:userId/restore", restoreUser);
+router.patch("/tasks/:taskId/archive", archiveTask);
+router.patch("/tasks/:taskId/restore", restoreTask);
 router.get("/exports/:resource", exportAdminResource);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);
