@@ -11,6 +11,67 @@ const allowedTaskStatuses = [
 ];
 
 const allowedTransportModes = ["walk", "bike", "car", "public_transport", "other"];
+const allowedUrgencyLevels = ["standard", "priority", "express"];
+const allowedCampusZones = ["central", "academic", "residential", "perimeter", "remote", "other"];
+
+const pricingSnapshotSchema = new mongoose.Schema(
+  {
+    mode: {
+      type: String,
+      enum: ["manual", "dynamic"],
+      default: "manual",
+    },
+    engineVersion: {
+      type: String,
+      trim: true,
+      default: "v1",
+    },
+    currency: {
+      type: String,
+      trim: true,
+      default: "INR",
+    },
+    quotedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    distanceKm: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    urgencyLevel: {
+      type: String,
+      enum: allowedUrgencyLevels,
+      default: "standard",
+    },
+    requestedTimeWindowMinutes: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    campusZone: {
+      type: String,
+      enum: allowedCampusZones,
+      default: "other",
+    },
+    demandOpenTaskCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    components: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    total: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+  },
+  { _id: false },
+);
 
 const promotionSnapshotSchema = new mongoose.Schema(
   {
@@ -102,11 +163,36 @@ const taskSchema = new mongoose.Schema(
       default: "other",
       index: true,
     },
+    distanceKm: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    urgencyLevel: {
+      type: String,
+      enum: allowedUrgencyLevels,
+      default: "standard",
+      index: true,
+    },
+    requestedTimeWindowMinutes: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    campusZone: {
+      type: String,
+      enum: allowedCampusZones,
+      default: "other",
+      index: true,
+    },
     reward: {
       type: Number,
       min: 0,
       default: 0,
     },
+    pricingSnapshot: {
+      type: pricingSnapshotSchema,
+      default: () => ({}),
     promotionSnapshot: {
       type: promotionSnapshotSchema,
       default: null,
@@ -276,9 +362,16 @@ taskSchema.index({ isArchived: 1, status: 1, createdAt: -1 });
 taskSchema.index({ campus: 1, status: 1, createdAt: -1 });
 taskSchema.index({ campusZone: 1, status: 1, createdAt: -1 });
 taskSchema.index({ transportMode: 1, status: 1, createdAt: -1 });
+taskSchema.index({ campus: 1, campusZone: 1, status: 1, createdAt: -1 });
 taskSchema.index({ requestedBy: 1, createdAt: -1 });
 taskSchema.index({ assignedRunner: 1, createdAt: -1 });
 
 const Task = mongoose.model("Task", taskSchema);
 
-export { Task, allowedTaskStatuses, allowedTransportModes };
+export {
+  Task,
+  allowedCampusZones,
+  allowedTaskStatuses,
+  allowedTransportModes,
+  allowedUrgencyLevels,
+};
