@@ -1,9 +1,11 @@
 import { Router } from "express";
 
 import {
+  listSessions,
   loginUser,
   logoutUser,
   refreshAccessToken,
+  revokeSessionById,
   registerUser,
   verifySession,
 } from "../controllers/auth.controller.js";
@@ -42,5 +44,7 @@ router.post(
   logoutUser,
 );
 router.get("/verify", verifyJWT, verifySession);
+router.get("/sessions", verifyJWT, listSessions);
+router.delete("/sessions/:sessionId", verifyJWT, revokeSessionById);
 
 export default router;
