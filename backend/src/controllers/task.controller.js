@@ -9,6 +9,9 @@ import {
   allowedUrgencyLevels,
 } from "../models/task.model.js";
 import {
+  calculateCampusAssignmentExpiryDate,
+  resolveCampusTaskRules,
+} from "../services/campusConfig.service.js";
   normalizeAttachmentMetadata,
   sanitizeAttachmentMetadata,
 } from "../utils/attachmentMetadata.js";
@@ -619,6 +622,7 @@ const createTask = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid transport mode provided");
   }
 
+  const scopedCampus =
   if (urgencyLevel && !allowedUrgencyLevels.includes(urgencyLevel)) {
     throw new ApiError(400, "Invalid urgencyLevel provided");
   }
@@ -632,6 +636,11 @@ const createTask = asyncHandler(async (req, res) => {
       ? campus.trim()
       : ensureUserHasCampusAccess(req.user, campus, "create");
 
+  const campusRuleResolution = await resolveCampusTaskRules({
+    campus: scopedCampus,
+    transportMode,
+    reward: normalizedReward,
+    action: "create",
   const useDynamicPricing = hasDynamicPricingInput({
     distanceKm,
     urgencyLevel,
@@ -673,6 +682,9 @@ const createTask = asyncHandler(async (req, res) => {
     description: description.trim(),
     pickupLocation: pickupLocation.trim(),
     dropoffLocation: dropoffLocation.trim(),
+    campus: campusRuleResolution.campus,
+    transportMode: campusRuleResolution.transportMode,
+    reward: normalizedReward,
     campus: normalizedCampus,
     campusZone: campusZone?.trim() || "",
     transportMode: transportMode || "other",
@@ -814,8 +826,15 @@ const acceptTask = asyncHandler(async (req, res) => {
     ensureUserHasCampusAccess(req.user, existingTask.campus, "accept");
   }
 
+  await resolveCampusTaskRules({
+    campus: existingTask.campus,
+    transportMode: existingTask.transportMode,
+    reward: existingTask.reward,
+    action: "accept",
+  });
+
   const acceptedAt = new Date();
-  const assignmentExpiresAt = calculateAssignmentExpiryDate(acceptedAt);
+  const assignmentExpiresAt = await calculateCampusAssignmentExpiryDate(existingTask.campus);
 
   const task = await Task.findOneAndUpdate(
     {

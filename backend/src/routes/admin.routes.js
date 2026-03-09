@@ -24,6 +24,13 @@ import {
   updateUserCampusScopes,
 } from "../controllers/admin.controller.js";
 import {
+  createCampusConfig,
+  getCampusConfigById,
+  listCampusConfigs,
+  updateCampusConfig,
+  updateCampusOperationalSettings,
+  updateCampusTransportRules,
+} from "../controllers/campusConfig.controller.js";
   getMaintenanceSettings,
   updateMaintenanceSettings,
 } from "../controllers/maintenance.controller.js";
@@ -50,6 +57,20 @@ router.put(
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
+);
+router.get("/campuses", listCampusConfigs);
+router.post("/campuses", createIdempotencyMiddleware(), createCampusConfig);
+router.get("/campuses/:campusId", getCampusConfigById);
+router.patch("/campuses/:campusId", createIdempotencyMiddleware(), updateCampusConfig);
+router.patch(
+  "/campuses/:campusId/transport-rules",
+  createIdempotencyMiddleware(),
+  updateCampusTransportRules,
+);
+router.patch(
+  "/campuses/:campusId/operational-settings",
+  createIdempotencyMiddleware(),
+  updateCampusOperationalSettings,
 );
 router.get("/maintenance", getMaintenanceSettings);
 router.patch("/maintenance", createIdempotencyMiddleware(), updateMaintenanceSettings);

@@ -8,6 +8,7 @@ import { swaggerDocument } from "./docs/swagger.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import adminRouter from "./routes/admin.routes.js";
 import authRouter from "./routes/auth.routes.js";
+import campusRouter from "./routes/campus.routes.js";
 import disputeRouter from "./routes/dispute.routes.js";
 import profileRouter from "./routes/profile.routes.js";
 import referralRouter from "./routes/referral.routes.js";
@@ -46,6 +47,7 @@ app.get("/api/v1/health", (_, res) => {
 
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/admin", adminRouter)
+app.use("/api/v1/campuses", campusRouter)
 app.use("/api/v1/disputes", disputeRouter)
 app.use("/api/v1/profile", profileRouter)
 app.use("/api/v1/referrals", referralRouter)
