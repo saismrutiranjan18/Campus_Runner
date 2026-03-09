@@ -15,6 +15,8 @@ import {
   listFraudFlags,
   listReportedIssues,
   refundTaskLedger,
+  restoreTask,
+  restoreUser,
   suspendUser,
   updateRunnerIncentiveRule,
   updateFraudFlagStatus,
@@ -69,6 +71,10 @@ router.post(
   evaluateRunnerIncentiveRules,
 );
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
+router.patch("/users/:userId/suspend", suspendUser);
+router.patch("/users/:userId/restore", restoreUser);
+router.patch("/tasks/:taskId/archive", archiveTask);
+router.patch("/tasks/:taskId/restore", restoreTask);
 router.get("/exports/:resource", exportAdminResource);
 router.patch("/users/:userId/suspend", suspendUser);
 router.patch("/tasks/:taskId/archive", archiveTask);

@@ -241,6 +241,24 @@ const taskSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    archivedStatusSnapshot: {
+      type: String,
+      enum: [...allowedTaskStatuses, ""],
+      default: "",
+    },
+    restoredAt: {
+      type: Date,
+      default: null,
+    },
+    restoredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    restoreReason: {
+      type: String,
+      trim: true,
+      default: "",
     attachments: {
       type: [attachmentMetadataSchema],
       default: [],
