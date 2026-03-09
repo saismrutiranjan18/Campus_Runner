@@ -90,6 +90,12 @@ const taskSchema = new mongoose.Schema(
       default: "",
       index: true,
     },
+    campusZone: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
     transportMode: {
       type: String,
       enum: allowedTransportModes,
@@ -226,6 +232,7 @@ taskSchema.index({ status: 1, assignmentExpiresAt: 1, isArchived: 1 });
 taskSchema.index({ settlementStatus: 1, completedAt: -1 });
 taskSchema.index({ isArchived: 1, status: 1, createdAt: -1 });
 taskSchema.index({ campus: 1, status: 1, createdAt: -1 });
+taskSchema.index({ campusZone: 1, status: 1, createdAt: -1 });
 taskSchema.index({ transportMode: 1, status: 1, createdAt: -1 });
 taskSchema.index({ requestedBy: 1, createdAt: -1 });
 taskSchema.index({ assignedRunner: 1, createdAt: -1 });

@@ -2,16 +2,20 @@ import { Router } from "express";
 
 import {
   archiveTask,
+  createRunnerIncentiveRule,
+  evaluateRunnerIncentiveRules,
   getAdminAnalyticsDashboard,
   getUserCampusScopes,
   getRequesterReputationById,
   getRequesterReputationMetrics,
   listFraudFlags,
+  listRunnerIncentiveRules,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
   listFraudFlags,
   listReportedIssues,
   suspendUser,
+  updateRunnerIncentiveRule,
   updateFraudFlagStatus,
   updateReportStatus,
   updateUserCampusScopes,
@@ -47,6 +51,22 @@ router.get("/requesters/reputation", getRequesterReputationMetrics);
 router.get("/requesters/:requesterId/reputation", getRequesterReputationById);
 router.get("/runners/performance", getRunnerPerformanceMetrics);
 router.get("/runners/:runnerId/performance", getRunnerPerformanceById);
+router.get("/runner-incentives/rules", listRunnerIncentiveRules);
+router.post(
+  "/runner-incentives/rules",
+  createIdempotencyMiddleware(),
+  createRunnerIncentiveRule,
+);
+router.patch(
+  "/runner-incentives/rules/:ruleId",
+  createIdempotencyMiddleware(),
+  updateRunnerIncentiveRule,
+);
+router.post(
+  "/runner-incentives/evaluate",
+  createIdempotencyMiddleware(),
+  evaluateRunnerIncentiveRules,
+);
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
 router.get("/exports/:resource", exportAdminResource);
 router.patch("/users/:userId/suspend", suspendUser);

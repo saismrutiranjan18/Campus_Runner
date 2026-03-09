@@ -16,6 +16,10 @@ import {
   buildRunnerPerformanceEntry,
 } from "../services/runnerPerformance.service.js";
 import {
+  allowedRunnerIncentiveRuleTypes,
+  RunnerIncentiveRule,
+} from "../models/runnerIncentiveRule.model.js";
+import { evaluateRunnerIncentives, normalizeCampusZones } from "../services/runnerIncentive.service.js";
   buildRequesterMetricsMap,
   buildRequesterReputationEntry,
 } from "../services/requesterReputation.service.js";
@@ -153,6 +157,7 @@ const sanitizeTask = (task) => {
     pickupLocation: task.pickupLocation,
     dropoffLocation: task.dropoffLocation,
     reward: task.reward,
+    campusZone: task.campusZone,
     status: task.status,
     isArchived: task.isArchived,
     archivedAt: task.archivedAt,
@@ -267,6 +272,169 @@ const sortRunnerPerformanceEntries = (entries, sortBy, order) => {
   });
 };
 
+const sanitizeRunnerIncentiveRule = (rule) => ({
+  id: rule._id,
+  code: rule.code,
+  name: rule.name,
+  description: rule.description,
+  type: rule.type,
+  rewardAmount: rule.rewardAmount,
+  minimumCompletedTasks: rule.minimumCompletedTasks,
+  minimumCompletionRate: rule.minimumCompletionRate,
+  campusZones: rule.campusZones || [],
+  isActive: rule.isActive,
+  createdBy: rule.createdBy?.fullName ? sanitizeUser(rule.createdBy) : null,
+  updatedBy: rule.updatedBy?.fullName ? sanitizeUser(rule.updatedBy) : null,
+  createdAt: rule.createdAt,
+  updatedAt: rule.updatedAt,
+});
+
+const sanitizeRunnerIncentivePayout = (item) => ({
+  runnerId: item.runnerId,
+  rewardAmount: item.rewardAmount,
+  status: item.status,
+  reference: item.reference,
+  rule: sanitizeRunnerIncentiveRule(item.rule),
+  evaluationSnapshot: item.evaluationSnapshot,
+  transaction: item.transaction
+    ? {
+        id: item.transaction._id,
+        user: sanitizeUser(item.transaction.user),
+        amount: item.transaction.amount,
+        status: item.transaction.status,
+        category: item.transaction.category,
+        reference: item.transaction.reference,
+        incentiveWindowStart: item.transaction.incentiveWindowStart,
+        incentiveWindowEnd: item.transaction.incentiveWindowEnd,
+        incentiveMetrics: item.transaction.incentiveMetrics,
+        createdAt: item.transaction.createdAt,
+      }
+    : null,
+});
+
+const parseRunnerIncentiveBoolean = (value, fieldName) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new ApiError(400, `${fieldName} must be a boolean`);
+};
+
+const normalizeRunnerIncentiveRulePayload = (payload, { partial = false } = {}) => {
+  const normalizedPayload = {};
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(payload, key);
+
+  if (!partial || hasOwn("code")) {
+    const code = String(payload.code || "").trim().toUpperCase();
+    if (!code) {
+      throw new ApiError(400, "code is required");
+    }
+
+    normalizedPayload.code = code;
+  }
+
+  if (!partial || hasOwn("name")) {
+    const name = String(payload.name || "").trim();
+    if (!name) {
+      throw new ApiError(400, "name is required");
+    }
+
+    normalizedPayload.name = name;
+  }
+
+  if (!partial || hasOwn("description")) {
+    normalizedPayload.description = String(payload.description || "").trim();
+  }
+
+  if (!partial || hasOwn("type")) {
+    if (!allowedRunnerIncentiveRuleTypes.includes(payload.type)) {
+      throw new ApiError(400, "Invalid runner incentive rule type provided");
+    }
+
+    normalizedPayload.type = payload.type;
+  }
+
+  if (!partial || hasOwn("rewardAmount")) {
+    const rewardAmount = Number(payload.rewardAmount);
+    if (Number.isNaN(rewardAmount) || rewardAmount <= 0) {
+      throw new ApiError(400, "rewardAmount must be a positive number");
+    }
+
+    normalizedPayload.rewardAmount = rewardAmount;
+  }
+
+  if (!partial || hasOwn("minimumCompletedTasks")) {
+    const minimumCompletedTasks = Number(payload.minimumCompletedTasks ?? 0);
+    if (!Number.isInteger(minimumCompletedTasks) || minimumCompletedTasks < 0) {
+      throw new ApiError(400, "minimumCompletedTasks must be a non-negative integer");
+    }
+
+    normalizedPayload.minimumCompletedTasks = minimumCompletedTasks;
+  }
+
+  if (!partial || hasOwn("minimumCompletionRate")) {
+    const minimumCompletionRate = Number(payload.minimumCompletionRate ?? 0);
+    if (
+      Number.isNaN(minimumCompletionRate) ||
+      minimumCompletionRate < 0 ||
+      minimumCompletionRate > 100
+    ) {
+      throw new ApiError(400, "minimumCompletionRate must be between 0 and 100");
+    }
+
+    normalizedPayload.minimumCompletionRate = minimumCompletionRate;
+  }
+
+  if (!partial || hasOwn("campusZones")) {
+    if (payload.campusZones !== undefined && !Array.isArray(payload.campusZones)) {
+      throw new ApiError(400, "campusZones must be an array of strings");
+    }
+
+    normalizedPayload.campusZones = normalizeCampusZones(payload.campusZones || []);
+  }
+
+  if (!partial || hasOwn("isActive")) {
+    normalizedPayload.isActive = parseRunnerIncentiveBoolean(
+      payload.isActive ?? true,
+      "isActive",
+    );
+  }
+
+  const resolvedType = normalizedPayload.type;
+  const resolvedMinimumCompletedTasks = normalizedPayload.minimumCompletedTasks;
+  const resolvedMinimumCompletionRate = normalizedPayload.minimumCompletionRate;
+  const resolvedCampusZones = normalizedPayload.campusZones;
+
+  if (resolvedType === "task_count" && resolvedMinimumCompletedTasks <= 0) {
+    throw new ApiError(400, "task_count rules require minimumCompletedTasks greater than 0");
+  }
+
+  if (resolvedType === "completion_rate" && resolvedMinimumCompletionRate <= 0) {
+    throw new ApiError(
+      400,
+      "completion_rate rules require minimumCompletionRate greater than 0",
+    );
+  }
+
+  if (resolvedType === "campus_zone") {
+    if (resolvedMinimumCompletedTasks <= 0) {
+      throw new ApiError(400, "campus_zone rules require minimumCompletedTasks greater than 0");
+    }
+
+    if (!resolvedCampusZones?.length) {
+      throw new ApiError(400, "campus_zone rules require at least one campus zone");
+    }
+  }
+
+  return normalizedPayload;
 const normalizeRequesterSortValue = (entry, sortBy) => {
   if (sortBy === "fullName") {
     return entry.requester.fullName.toLowerCase();
@@ -409,6 +577,25 @@ const getRunnerPerformanceById = asyncHandler(async (req, res) => {
   );
 });
 
+const listRunnerIncentiveRules = asyncHandler(async (req, res) => {
+  const filters = {};
+
+  if (req.query.type) {
+    if (!allowedRunnerIncentiveRuleTypes.includes(req.query.type)) {
+      throw new ApiError(400, "Invalid runner incentive rule type filter");
+    }
+
+    filters.type = req.query.type;
+  }
+
+  if (req.query.active !== undefined) {
+    filters.isActive = parseRunnerIncentiveBoolean(req.query.active, "active");
+  }
+
+  const rules = await RunnerIncentiveRule.find(filters)
+    .populate("createdBy", "fullName email phoneNumber role isVerified isActive")
+    .populate("updatedBy", "fullName email phoneNumber role isVerified isActive")
+    .sort({ isActive: -1, createdAt: -1 });
 const getRequesterReputationMetrics = asyncHandler(async (req, res) => {
   const {
     search,
@@ -483,6 +670,110 @@ const getRequesterReputationMetrics = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
+        items: rules.map(sanitizeRunnerIncentiveRule),
+        filters: {
+          type: req.query.type || "",
+          active: req.query.active ?? "",
+        },
+      },
+      "Runner incentive rules fetched successfully",
+    ),
+  );
+});
+
+const createRunnerIncentiveRule = asyncHandler(async (req, res) => {
+  const normalizedPayload = normalizeRunnerIncentiveRulePayload(req.body);
+
+  const existingRule = await RunnerIncentiveRule.findOne({ code: normalizedPayload.code });
+  if (existingRule) {
+    throw new ApiError(409, "Runner incentive rule code already exists");
+  }
+
+  const rule = await RunnerIncentiveRule.create({
+    ...normalizedPayload,
+    createdBy: req.user._id,
+    updatedBy: req.user._id,
+  });
+
+  await rule.populate("createdBy", "fullName email phoneNumber role isVerified isActive");
+  await rule.populate("updatedBy", "fullName email phoneNumber role isVerified isActive");
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      sanitizeRunnerIncentiveRule(rule),
+      "Runner incentive rule created successfully",
+    ),
+  );
+});
+
+const updateRunnerIncentiveRule = asyncHandler(async (req, res) => {
+  const { ruleId } = req.params;
+  ensureValidObjectId(ruleId, "runner incentive rule id");
+
+  const existingRule = await RunnerIncentiveRule.findById(ruleId);
+  if (!existingRule) {
+    throw new ApiError(404, "Runner incentive rule not found");
+  }
+
+  const mergedPayload = {
+    code: existingRule.code,
+    name: existingRule.name,
+    description: existingRule.description,
+    type: existingRule.type,
+    rewardAmount: existingRule.rewardAmount,
+    minimumCompletedTasks: existingRule.minimumCompletedTasks,
+    minimumCompletionRate: existingRule.minimumCompletionRate,
+    campusZones: existingRule.campusZones,
+    isActive: existingRule.isActive,
+    ...req.body,
+  };
+  const normalizedPayload = normalizeRunnerIncentiveRulePayload(mergedPayload, {
+    partial: true,
+  });
+
+  if (
+    normalizedPayload.code &&
+    normalizedPayload.code !== existingRule.code &&
+    (await RunnerIncentiveRule.exists({ code: normalizedPayload.code, _id: { $ne: ruleId } }))
+  ) {
+    throw new ApiError(409, "Runner incentive rule code already exists");
+  }
+
+  Object.assign(existingRule, normalizedPayload, {
+    updatedBy: req.user._id,
+  });
+
+  await existingRule.save();
+  await existingRule.populate("createdBy", "fullName email phoneNumber role isVerified isActive");
+  await existingRule.populate("updatedBy", "fullName email phoneNumber role isVerified isActive");
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      sanitizeRunnerIncentiveRule(existingRule),
+      "Runner incentive rule updated successfully",
+    ),
+  );
+});
+
+const evaluateRunnerIncentiveRules = asyncHandler(async (req, res) => {
+  const { ruleIds, windowStart, windowEnd, previewOnly = false, referenceDate } = req.body;
+
+  if (ruleIds !== undefined) {
+    if (!Array.isArray(ruleIds) || ruleIds.some((ruleId) => !mongoose.isValidObjectId(ruleId))) {
+      throw new ApiError(400, "ruleIds must be an array of valid rule ids");
+    }
+  }
+
+  const evaluationResult = await evaluateRunnerIncentives({
+    initiatedBy: req.user._id,
+    ruleIds,
+    windowStart,
+    windowEnd,
+    referenceDate,
+    previewOnly: parseRunnerIncentiveBoolean(previewOnly, "previewOnly"),
+  });
         items: paginatedItems,
         pagination: {
           page: resolvedPage,
@@ -522,6 +813,15 @@ const getRequesterReputationById = asyncHandler(async (req, res) => {
   res.status(200).json(
     new ApiResponse(
       200,
+      {
+        window: {
+          start: evaluationResult.window.windowStart,
+          end: evaluationResult.window.windowEnd,
+        },
+        summary: evaluationResult.summary,
+        items: evaluationResult.items.map(sanitizeRunnerIncentivePayout),
+      },
+      "Runner incentive evaluation completed successfully",
       requesterReputation,
       "Requester reputation metrics fetched successfully",
     ),
@@ -1085,15 +1385,19 @@ const updateFraudFlagStatus = asyncHandler(async (req, res) => {
 
 export {
   archiveTask,
+  createRunnerIncentiveRule,
+  evaluateRunnerIncentiveRules,
   getAdminAnalyticsDashboard,
   getRequesterReputationById,
   getRequesterReputationMetrics,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
   getUserCampusScopes,
+  listRunnerIncentiveRules,
   listFraudFlags,
   listReportedIssues,
   suspendUser,
+  updateRunnerIncentiveRule,
   updateReportStatus,
   updateFraudFlagStatus,
   updateUserCampusScopes,
