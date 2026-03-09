@@ -21,6 +21,7 @@ import {
   rateLimitPolicies,
 } from "../middlewares/rateLimit.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
+import { createMaintenanceGateMiddleware } from "../middlewares/maintenance.middleware.js";
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.get("/:taskId", getTaskById);
 router.post(
   "/",
   authorizeRoles("requester", "admin"),
+  createMaintenanceGateMiddleware("taskCreation"),
   createRateLimitMiddleware(rateLimitPolicies.taskCreate),
   createTask,
 );

@@ -14,6 +14,7 @@ import {
   getRunnerPerformanceMetrics,
   listFraudFlags,
   listReportedIssues,
+  refundTaskLedger,
   restoreTask,
   restoreUser,
   suspendUser,
@@ -30,6 +31,9 @@ import {
   updateCampusOperationalSettings,
   updateCampusTransportRules,
 } from "../controllers/campusConfig.controller.js";
+  getMaintenanceSettings,
+  updateMaintenanceSettings,
+} from "../controllers/maintenance.controller.js";
 import { createPromotion, listPromotions, updatePromotion } from "../controllers/promotion.controller.js";
 import { exportAdminResource } from "../controllers/adminExport.controller.js";
 import {
@@ -68,6 +72,8 @@ router.patch(
   createIdempotencyMiddleware(),
   updateCampusOperationalSettings,
 );
+router.get("/maintenance", getMaintenanceSettings);
+router.patch("/maintenance", createIdempotencyMiddleware(), updateMaintenanceSettings);
 router.get("/promotions", listPromotions);
 router.post("/promotions", createIdempotencyMiddleware(), createPromotion);
 router.patch("/promotions/:promotionId", createIdempotencyMiddleware(), updatePromotion);
@@ -115,6 +121,7 @@ router.patch(
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
 router.patch("/users/:userId/suspend", createIdempotencyMiddleware(), suspendUser);
 router.patch("/tasks/:taskId/archive", createIdempotencyMiddleware(), archiveTask);
+router.patch("/tasks/:taskId/refund", createIdempotencyMiddleware(), refundTaskLedger);
 router.get("/fraud-flags", listFraudFlags);
 router.patch(
   "/fraud-flags/:flagId/status",

@@ -20,6 +20,7 @@ import {
   rateLimitPolicies,
 } from "../middlewares/rateLimit.middleware.js";
 import { createIdempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
+import { createMaintenanceGateMiddleware } from "../middlewares/maintenance.middleware.js";
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.post("/promotions/claim", createIdempotencyMiddleware(), claimPromotionWa
 router.post(
   "/withdrawals",
   authorizeRoles("runner"),
+  createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),
   createWithdrawalRequest,
@@ -38,6 +40,7 @@ router.post(
 router.patch(
   "/withdrawals/:transactionId/approve",
   authorizeRoles("admin"),
+  createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),
   approveWithdrawalRequest,
@@ -45,6 +48,7 @@ router.patch(
 router.patch(
   "/withdrawals/:transactionId/reject",
   authorizeRoles("admin"),
+  createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),
   rejectWithdrawalRequest,
@@ -70,6 +74,7 @@ router.patch(
 router.post(
   "/transactions/credit",
   authorizeRoles("admin"),
+  createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),
   createCreditTransaction,
@@ -77,6 +82,7 @@ router.post(
 router.post(
   "/transactions/debit",
   authorizeRoles("admin"),
+  createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),
   createDebitTransaction,
@@ -84,6 +90,7 @@ router.post(
 router.patch(
   "/transactions/:transactionId/status",
   authorizeRoles("admin"),
+  createMaintenanceGateMiddleware("walletMutations"),
   createRateLimitMiddleware(rateLimitPolicies.walletChange),
   createIdempotencyMiddleware(),
   updateWalletTransactionStatus,

@@ -13,6 +13,8 @@ const allowedWalletTransactionStatuses = ["pending", "completed", "failed"];
 const allowedWalletTransactionCategories = [
   "manual",
   "withdrawal_request",
+  "refund",
+  "reversal",
   "promotion_credit",
   "runner_incentive",
   "referral_reward",
@@ -125,6 +127,16 @@ const walletTransactionSchema = new mongoose.Schema(
     initiatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null,
+    },
+    linkedTransaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransaction",
+      default: null,
+    },
+    sourceDispute: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Dispute",
       default: null,
     },
     retrySourceTransaction: {

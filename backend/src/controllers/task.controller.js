@@ -2,9 +2,11 @@ import mongoose from "mongoose";
 
 import { calculateAssignmentExpiryDate } from "../background/taskExpiry.monitor.js";
 import {
+  allowedCampusZones,
   allowedTaskStatuses,
   allowedTransportModes,
   Task,
+  allowedUrgencyLevels,
 } from "../models/task.model.js";
 import {
   calculateCampusAssignmentExpiryDate,
@@ -15,6 +17,11 @@ import {
 } from "../utils/attachmentMetadata.js";
 import { ensureUserHasCampusAccess } from "../utils/campusScope.js";
 import { evaluateTaskForFraudFlags } from "../services/fraudDetection.service.js";
+import {
+  createManualPricingSnapshot,
+  generateTaskPricingQuote,
+  hasDynamicPricingInput,
+} from "../services/taskPricing.service.js";
 import { validateTaskPromotion, recordTaskPromotionRedemption } from "../services/promotion.service.js";
 import { awardReferralForUserIfEligible } from "../services/referral.service.js";
 import { settleRunnerEarningsForTask } from "../services/taskSettlement.service.js";
@@ -80,7 +87,12 @@ const sanitizeTask = (task) => ({
   campus: task.campus,
   campusZone: task.campusZone,
   transportMode: task.transportMode,
+  distanceKm: task.distanceKm,
+  urgencyLevel: task.urgencyLevel,
+  requestedTimeWindowMinutes: task.requestedTimeWindowMinutes,
+  campusZone: task.campusZone,
   reward: task.reward,
+  pricingSnapshot: task.pricingSnapshot || null,
   promotionSnapshot: task.promotionSnapshot,
   status: task.status,
   requestedBy: sanitizeTaskUser(task.requestedBy),
@@ -420,6 +432,16 @@ const ensureTaskRequesterOrAdmin = (task, user) => {
 };
 
 const previewTaskQuote = asyncHandler(async (req, res) => {
+  const {
+    campus,
+    distanceKm,
+    urgencyLevel,
+    requestedTimeWindowMinutes,
+    campusZone,
+  } = req.body;
+
+  if (!campus) {
+    throw new ApiError(400, "campus is required to preview a quote");
   const { campus, reward, promoCode } = req.body;
 
   if (!campus) {
@@ -433,6 +455,17 @@ const previewTaskQuote = asyncHandler(async (req, res) => {
 
   const normalizedCampus =
     req.user.role === "admin"
+      ? String(campus).trim()
+      : ensureUserHasCampusAccess(req.user, campus, "preview pricing");
+
+  const quote = await generateTaskPricingQuote({
+    campus: normalizedCampus,
+    distanceKm,
+    urgencyLevel,
+    requestedTimeWindowMinutes,
+    campusZone,
+  });
+
       ? campus.trim()
       : ensureUserHasCampusAccess(req.user, campus, "preview quote");
 
@@ -450,6 +483,9 @@ const previewTaskQuote = asyncHandler(async (req, res) => {
       200,
       {
         campus: normalizedCampus,
+        quote,
+      },
+      "Task quote preview generated successfully",
         subtotal: normalizedReward,
         promotion: promotionValidation
           ? {
@@ -562,6 +598,10 @@ const createTask = asyncHandler(async (req, res) => {
     campus,
     campusZone,
     transportMode,
+    distanceKm,
+    urgencyLevel,
+    requestedTimeWindowMinutes,
+    campusZone,
     promoCode,
     reward,
   } = req.body;
@@ -583,6 +623,15 @@ const createTask = asyncHandler(async (req, res) => {
   }
 
   const scopedCampus =
+  if (urgencyLevel && !allowedUrgencyLevels.includes(urgencyLevel)) {
+    throw new ApiError(400, "Invalid urgencyLevel provided");
+  }
+
+  if (campusZone && !allowedCampusZones.includes(campusZone)) {
+    throw new ApiError(400, "Invalid campusZone provided");
+  }
+
+  const normalizedCampus =
     req.user.role === "admin"
       ? campus.trim()
       : ensureUserHasCampusAccess(req.user, campus, "create");
@@ -592,6 +641,35 @@ const createTask = asyncHandler(async (req, res) => {
     transportMode,
     reward: normalizedReward,
     action: "create",
+  const useDynamicPricing = hasDynamicPricingInput({
+    distanceKm,
+    urgencyLevel,
+    requestedTimeWindowMinutes,
+    campusZone,
+  });
+
+  const pricingSnapshot = useDynamicPricing
+    ? await generateTaskPricingQuote({
+        campus: normalizedCampus,
+        distanceKm,
+        urgencyLevel,
+        requestedTimeWindowMinutes,
+        campusZone,
+      })
+    : createManualPricingSnapshot({
+        reward: normalizedReward,
+        transportMode: transportMode || "other",
+        distanceKm: distanceKm === undefined ? 0 : Number(distanceKm) || 0,
+        urgencyLevel: urgencyLevel || "standard",
+        requestedTimeWindowMinutes:
+          requestedTimeWindowMinutes === undefined || requestedTimeWindowMinutes === null
+            ? null
+            : Number(requestedTimeWindowMinutes),
+        campusZone: campusZone || "other",
+      });
+
+  const finalReward = pricingSnapshot.total;
+
   const promotionValidation = await validateTaskPromotion({
     code: promoCode,
     userId: req.user._id,
@@ -610,6 +688,12 @@ const createTask = asyncHandler(async (req, res) => {
     campus: normalizedCampus,
     campusZone: campusZone?.trim() || "",
     transportMode: transportMode || "other",
+    distanceKm: pricingSnapshot.distanceKm,
+    urgencyLevel: pricingSnapshot.urgencyLevel,
+    requestedTimeWindowMinutes: pricingSnapshot.requestedTimeWindowMinutes,
+    campusZone: pricingSnapshot.campusZone,
+    reward: finalReward,
+    pricingSnapshot,
     reward: promotionValidation ? promotionValidation.finalReward : normalizedReward,
     promotionSnapshot: promotionValidation ? promotionValidation.snapshot : null,
     requestedBy: req.user._id,
