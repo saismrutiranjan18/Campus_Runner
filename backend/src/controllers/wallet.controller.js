@@ -23,6 +23,10 @@ const walletPopulateFields = [
     select: "fullName email phoneNumber role isVerified isActive",
   },
   {
+    path: "incentiveRule",
+    select: "code name type rewardAmount isActive",
+  },
+  {
     path: "reviewedBy",
     select: "fullName email phoneNumber role isVerified isActive",
   },
@@ -60,6 +64,19 @@ const sanitizeTransaction = (transaction) => ({
   sourceTaskId: transaction.sourceTask?._id || transaction.sourceTask || null,
   sourceDisputeId: transaction.sourceDispute?._id || transaction.sourceDispute || null,
   linkedTransactionId: transaction.linkedTransaction?._id || transaction.linkedTransaction || null,
+  incentiveRule: transaction.incentiveRule
+    ? {
+        id: transaction.incentiveRule._id || transaction.incentiveRule,
+        code: transaction.incentiveRule.code,
+        name: transaction.incentiveRule.name,
+        type: transaction.incentiveRule.type,
+        rewardAmount: transaction.incentiveRule.rewardAmount,
+        isActive: transaction.incentiveRule.isActive,
+      }
+    : null,
+  incentiveWindowStart: transaction.incentiveWindowStart,
+  incentiveWindowEnd: transaction.incentiveWindowEnd,
+  incentiveMetrics: transaction.incentiveMetrics || null,
   failureReason: transaction.failureReason,
   reviewedAt: transaction.reviewedAt,
   reviewNote: transaction.reviewNote,
