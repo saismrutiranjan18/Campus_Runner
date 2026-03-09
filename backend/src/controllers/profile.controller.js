@@ -21,6 +21,7 @@ const sanitizeUser = (user) => ({
   phoneNumber: user.phoneNumber,
   campusId: user.campusId,
   campusName: user.campusName,
+  inviteCode: user.inviteCode,
   campusScopes: (user.campusScopes || []).map((scope) => ({
     campusId: scope.campusId,
     campusName: scope.campusName,
