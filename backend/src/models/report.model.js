@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { attachmentMetadataSchema } from "../utils/attachmentMetadata.js";
+
 const allowedReportEntityTypes = ["user", "task"];
 const allowedReportStatuses = ["open", "reviewed", "resolved", "dismissed"];
 
@@ -56,6 +58,10 @@ const reportSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    attachments: {
+      type: [attachmentMetadataSchema],
+      default: [],
     },
   },
   {

@@ -15,7 +15,12 @@ import {
   buildRunnerMetricsMap,
   buildRunnerPerformanceEntry,
 } from "../services/runnerPerformance.service.js";
+import {
+  buildRequesterMetricsMap,
+  buildRequesterReputationEntry,
+} from "../services/requesterReputation.service.js";
 import { WalletTransaction } from "../models/walletTransaction.model.js";
+import { sanitizeAttachmentMetadata } from "../utils/attachmentMetadata.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -34,6 +39,10 @@ const reportPopulateFields = [
   },
   {
     path: "reviewedBy",
+    select: "fullName email phoneNumber role isVerified isActive",
+  },
+  {
+    path: "attachments.uploadedBy",
     select: "fullName email phoneNumber role isVerified isActive",
   },
   {
@@ -151,6 +160,9 @@ const sanitizeTask = (task) => {
     requestedBy: sanitizeTaskUser(task.requestedBy),
     assignedRunner: sanitizeTaskUser(task.assignedRunner),
     archivedBy: sanitizeTaskUser(task.archivedBy),
+    attachments: (task.attachments || []).map((attachment) =>
+      sanitizeAttachmentMetadata(attachment, sanitizeTaskUser),
+    ),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
@@ -164,6 +176,9 @@ const sanitizeReport = (report) => ({
   reportedTask: sanitizeTask(report.reportedTask),
   reason: report.reason,
   details: report.details,
+  attachments: (report.attachments || []).map((attachment) =>
+    sanitizeAttachmentMetadata(attachment, sanitizeUser),
+  ),
   status: report.status,
   reviewedBy: sanitizeUser(report.reviewedBy),
   reviewedAt: report.reviewedAt,
@@ -249,6 +264,31 @@ const sortRunnerPerformanceEntries = (entries, sortBy, order) => {
     }
 
     return left.runner.fullName.localeCompare(right.runner.fullName);
+  });
+};
+
+const normalizeRequesterSortValue = (entry, sortBy) => {
+  if (sortBy === "fullName") {
+    return entry.requester.fullName.toLowerCase();
+  }
+
+  return entry.metrics[sortBy] ?? 0;
+};
+
+const sortRequesterReputationEntries = (entries, sortBy, order) => {
+  return [...entries].sort((left, right) => {
+    const leftValue = normalizeRequesterSortValue(left, sortBy);
+    const rightValue = normalizeRequesterSortValue(right, sortBy);
+
+    if (leftValue < rightValue) {
+      return order === "asc" ? -1 : 1;
+    }
+
+    if (leftValue > rightValue) {
+      return order === "asc" ? 1 : -1;
+    }
+
+    return left.requester.fullName.localeCompare(right.requester.fullName);
   });
 };
 
@@ -365,6 +405,125 @@ const getRunnerPerformanceById = asyncHandler(async (req, res) => {
         metrics: runnerPerformance.metrics,
       },
       "Runner performance metrics fetched successfully",
+    ),
+  );
+});
+
+const getRequesterReputationMetrics = asyncHandler(async (req, res) => {
+  const {
+    search,
+    active,
+    verified,
+    campusId,
+    page = 1,
+    limit = 20,
+    sortBy = "trustScore",
+    order = "desc",
+  } = req.query;
+
+  const requesterFilters = { role: "requester" };
+  const resolvedPage = Math.max(Number(page) || 1, 1);
+  const resolvedLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const allowedSortFields = [
+    "fullName",
+    "totalTaskCount",
+    "completedTaskCount",
+    "cancelledTaskCount",
+    "completionRate",
+    "cancellationRate",
+    "disputeCount",
+    "reportCount",
+    "moderationIncidentCount",
+    "trustScore",
+  ];
+  const resolvedOrder = String(order).toLowerCase() === "asc" ? "asc" : "desc";
+
+  if (!allowedSortFields.includes(sortBy)) {
+    throw new ApiError(400, "Invalid requester reputation sort field");
+  }
+
+  if (active !== undefined) {
+    requesterFilters.isActive = active === "true";
+  }
+
+  if (verified !== undefined) {
+    requesterFilters.isVerified = verified === "true";
+  }
+
+  if (campusId) {
+    requesterFilters.campusId = campusId;
+  }
+
+  if (search?.trim()) {
+    requesterFilters.$or = [
+      { fullName: { $regex: search.trim(), $options: "i" } },
+      { email: { $regex: search.trim(), $options: "i" } },
+      { phoneNumber: { $regex: search.trim(), $options: "i" } },
+    ];
+  }
+
+  const requesters = await User.find(requesterFilters).sort({ createdAt: -1 });
+  const metricsByRequesterId = await buildRequesterMetricsMap(
+    requesters.map((requester) => requester._id),
+  );
+  const entries = requesters.map((requester) =>
+    buildRequesterReputationEntry(
+      requester,
+      metricsByRequesterId.get(String(requester._id)),
+    ),
+  );
+  const sortedEntries = sortRequesterReputationEntries(entries, sortBy, resolvedOrder);
+  const total = sortedEntries.length;
+  const paginatedItems = sortedEntries.slice(
+    (resolvedPage - 1) * resolvedLimit,
+    resolvedPage * resolvedLimit,
+  );
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: paginatedItems,
+        pagination: {
+          page: resolvedPage,
+          limit: resolvedLimit,
+          total,
+          totalPages: Math.ceil(total / resolvedLimit) || 1,
+        },
+        filters: {
+          search: search || "",
+          active: active ?? "",
+          verified: verified ?? "",
+          campusId: campusId || "",
+          sortBy,
+          order: resolvedOrder,
+        },
+      },
+      "Requester reputation metrics fetched successfully",
+    ),
+  );
+});
+
+const getRequesterReputationById = asyncHandler(async (req, res) => {
+  const { requesterId } = req.params;
+  ensureValidObjectId(requesterId, "requester id");
+
+  const requester = await User.findOne({ _id: requesterId, role: "requester" });
+  if (!requester) {
+    throw new ApiError(404, "Requester not found");
+  }
+
+  const metricsByRequesterId = await buildRequesterMetricsMap([requester._id]);
+  const requesterReputation = buildRequesterReputationEntry(
+    requester,
+    metricsByRequesterId.get(String(requester._id)),
+  );
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      requesterReputation,
+      "Requester reputation metrics fetched successfully",
     ),
   );
 });
@@ -927,6 +1086,8 @@ const updateFraudFlagStatus = asyncHandler(async (req, res) => {
 export {
   archiveTask,
   getAdminAnalyticsDashboard,
+  getRequesterReputationById,
+  getRequesterReputationMetrics,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
   getUserCampusScopes,

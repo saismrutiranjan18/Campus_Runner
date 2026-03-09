@@ -2,7 +2,11 @@ import mongoose from "mongoose";
 
 const allowedWalletTransactionTypes = ["credit", "debit"];
 const allowedWalletTransactionStatuses = ["pending", "completed", "failed"];
-const allowedWalletTransactionCategories = ["manual", "withdrawal_request"];
+const allowedWalletTransactionCategories = [
+  "manual",
+  "withdrawal_request",
+  "referral_reward",
+];
 
 const walletTransactionSchema = new mongoose.Schema(
   {

@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { attachmentMetadataSchema } from "../utils/attachmentMetadata.js";
+
 const allowedTaskStatuses = [
   "open",
   "accepted",
@@ -154,6 +156,10 @@ const taskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+    },
+    attachments: {
+      type: [attachmentMetadataSchema],
+      default: [],
     },
   },
   {
