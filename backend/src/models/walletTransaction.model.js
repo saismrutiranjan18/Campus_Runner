@@ -5,6 +5,7 @@ const allowedWalletTransactionStatuses = ["pending", "completed", "failed"];
 const allowedWalletTransactionCategories = [
   "manual",
   "withdrawal_request",
+  "promotion_credit",
   "runner_incentive",
   "referral_reward",
 ];

@@ -12,6 +12,7 @@ import {
   listOpenTasks,
   listProtectedTaskActions,
   markTaskInProgress,
+  previewTaskQuote,
   removeTaskAttachment,
 } from "../controllers/task.controller.js";
 import { authorizeRoles, verifyJWT } from "../middlewares/auth.middleware.js";
@@ -27,6 +28,7 @@ router.use(verifyJWT);
 
 router.get("/protected-actions", listProtectedTaskActions);
 router.get("/history", authorizeRoles("requester"), listRequesterTaskHistory);
+router.post("/quote-preview", authorizeRoles("requester", "admin"), previewTaskQuote);
 router.get("/", listTasks);
 router.get("/open", listOpenTasks);
 router.post("/:taskId/attachments", addTaskAttachment);

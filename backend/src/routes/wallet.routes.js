@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   approveWithdrawalRequest,
+  claimPromotionWalletCredit,
   createCreditTransaction,
   createDebitTransaction,
   createWithdrawalRequest,
@@ -23,6 +24,7 @@ router.use(verifyJWT);
 
 router.get("/balance", getMyWalletBalance);
 router.get("/transactions", listWalletTransactions);
+router.post("/promotions/claim", createIdempotencyMiddleware(), claimPromotionWalletCredit);
 router.post(
   "/withdrawals",
   authorizeRoles("runner"),

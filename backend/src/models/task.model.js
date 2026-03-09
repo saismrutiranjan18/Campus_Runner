@@ -12,6 +12,56 @@ const allowedTaskStatuses = [
 
 const allowedTransportModes = ["walk", "bike", "car", "public_transport", "other"];
 
+const promotionSnapshotSchema = new mongoose.Schema(
+  {
+    code: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    promotionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Promotion",
+      default: null,
+    },
+    kind: {
+      type: String,
+      enum: ["task_discount"],
+      default: "task_discount",
+    },
+    discountType: {
+      type: String,
+      enum: ["fixed", "percentage"],
+      default: "fixed",
+    },
+    discountValue: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    discountAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    originalReward: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    finalReward: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    appliedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false },
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -56,6 +106,10 @@ const taskSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       default: 0,
+    },
+    promotionSnapshot: {
+      type: promotionSnapshotSchema,
+      default: null,
     },
     requestedBy: {
       type: mongoose.Schema.Types.ObjectId,

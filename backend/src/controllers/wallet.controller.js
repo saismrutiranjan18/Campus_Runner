@@ -7,6 +7,7 @@ import {
   allowedWalletTransactionStatuses,
 } from "../models/walletTransaction.model.js";
 import { evaluateWalletTransactionForFraudFlags } from "../services/fraudDetection.service.js";
+import { claimWalletCreditPromotion } from "../services/promotion.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -480,6 +481,30 @@ const createWithdrawalRequest = asyncHandler(async (req, res) => {
   );
 });
 
+const claimPromotionWalletCredit = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+
+  const result = await claimWalletCreditPromotion({
+    code,
+    user: req.user,
+  });
+
+  const transaction = await WalletTransaction.findById(result.walletTransaction._id).populate(
+    walletPopulateFields,
+  );
+
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      {
+        code: result.promotion.code,
+        transaction: sanitizeTransaction(transaction),
+      },
+      "Promotion wallet credit claimed successfully",
+    ),
+  );
+});
+
 const approveWithdrawalRequest = asyncHandler(async (req, res) => {
   const { transactionId } = req.params;
   const { reviewNote } = req.body;
@@ -580,6 +605,7 @@ const updateWalletTransactionStatus = asyncHandler(async (req, res) => {
 
 export {
   approveWithdrawalRequest,
+  claimPromotionWalletCredit,
   createCreditTransaction,
   createDebitTransaction,
   createWithdrawalRequest,

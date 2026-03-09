@@ -20,6 +20,7 @@ import {
   updateReportStatus,
   updateUserCampusScopes,
 } from "../controllers/admin.controller.js";
+import { createPromotion, listPromotions, updatePromotion } from "../controllers/promotion.controller.js";
 import { exportAdminResource } from "../controllers/adminExport.controller.js";
 import {
   addReportAttachment,
@@ -43,6 +44,9 @@ router.put(
   createIdempotencyMiddleware(),
   updateUserCampusScopes,
 );
+router.get("/promotions", listPromotions);
+router.post("/promotions", createIdempotencyMiddleware(), createPromotion);
+router.patch("/promotions/:promotionId", createIdempotencyMiddleware(), updatePromotion);
 router.get("/requesters/reputation", getRequesterReputationMetrics);
 router.get("/requesters/:requesterId/reputation", getRequesterReputationById);
 router.get("/runners/performance", getRunnerPerformanceMetrics);
