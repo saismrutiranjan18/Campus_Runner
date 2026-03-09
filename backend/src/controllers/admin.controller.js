@@ -124,6 +124,8 @@ const sanitizeUser = (user) => {
     isActive: user.isActive,
     suspendedAt: user.suspendedAt,
     suspensionReason: user.suspensionReason,
+    restoredAt: user.restoredAt,
+    restoreReason: user.restoreReason,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -162,6 +164,9 @@ const sanitizeTask = (task) => {
     isArchived: task.isArchived,
     archivedAt: task.archivedAt,
     archiveReason: task.archiveReason,
+    archivedStatusSnapshot: task.archivedStatusSnapshot,
+    restoredAt: task.restoredAt,
+    restoreReason: task.restoreReason,
     requestedBy: sanitizeTaskUser(task.requestedBy),
     assignedRunner: sanitizeTaskUser(task.assignedRunner),
     archivedBy: sanitizeTaskUser(task.archivedBy),
@@ -1110,11 +1115,44 @@ const suspendUser = asyncHandler(async (req, res) => {
   user.suspendedAt = new Date();
   user.suspensionReason = suspensionReason?.trim() || "Suspended by admin moderation";
   user.suspendedBy = req.user._id;
+  user.restoredAt = null;
+  user.restoredBy = null;
+  user.restoreReason = "";
 
   await user.save({ validateBeforeSave: false });
 
   res.status(200).json(
     new ApiResponse(200, sanitizeUser(user), "User suspended successfully"),
+  );
+});
+
+const restoreUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { restoreReason } = req.body;
+
+  ensureValidObjectId(userId, "user id");
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.isActive && !user.suspendedAt) {
+    throw new ApiError(409, "User is not suspended");
+  }
+
+  user.isActive = true;
+  user.suspendedAt = null;
+  user.suspensionReason = "";
+  user.suspendedBy = null;
+  user.restoredAt = new Date();
+  user.restoredBy = req.user._id;
+  user.restoreReason = restoreReason?.trim() || "Restored by admin recovery";
+
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json(
+    new ApiResponse(200, sanitizeUser(user), "User restored successfully"),
   );
 });
 
@@ -1141,6 +1179,10 @@ const archiveTask = asyncHandler(async (req, res) => {
   task.archivedAt = new Date();
   task.archiveReason = archiveReason?.trim() || "Archived by admin moderation";
   task.archivedBy = req.user._id;
+  task.archivedStatusSnapshot = task.status;
+  task.restoredAt = null;
+  task.restoredBy = null;
+  task.restoreReason = "";
 
   if (["open", "accepted", "in_progress"].includes(task.status)) {
     task.status = "cancelled";
@@ -1153,6 +1195,50 @@ const archiveTask = asyncHandler(async (req, res) => {
 
   res.status(200).json(
     new ApiResponse(200, sanitizeTask(task), "Task archived successfully"),
+  );
+});
+
+const restoreTask = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const { restoreReason } = req.body;
+
+  ensureValidObjectId(taskId, "task id");
+
+  const task = await Task.findById(taskId)
+    .populate("requestedBy", "fullName email phoneNumber role isVerified isActive")
+    .populate("assignedRunner", "fullName email phoneNumber role isVerified isActive")
+    .populate("archivedBy", "fullName email phoneNumber role isVerified isActive");
+
+  if (!task) {
+    throw new ApiError(404, "Task not found");
+  }
+
+  if (!task.isArchived) {
+    throw new ApiError(409, "Task is not archived");
+  }
+
+  const restoredStatus = task.archivedStatusSnapshot || task.status || "open";
+
+  task.isArchived = false;
+  task.archivedAt = null;
+  task.archiveReason = "";
+  task.archivedBy = null;
+  task.status = restoredStatus;
+  task.archivedStatusSnapshot = "";
+  task.restoredAt = new Date();
+  task.restoredBy = req.user._id;
+  task.restoreReason = restoreReason?.trim() || "Restored by admin recovery";
+
+  if (restoredStatus !== "cancelled") {
+    task.cancelledAt = null;
+    task.cancellationReason = "";
+  }
+
+  await task.save();
+  await task.populate("archivedBy", "fullName email phoneNumber role isVerified isActive");
+
+  res.status(200).json(
+    new ApiResponse(200, sanitizeTask(task), "Task restored successfully"),
   );
 });
 
@@ -1396,6 +1482,8 @@ export {
   listRunnerIncentiveRules,
   listFraudFlags,
   listReportedIssues,
+  restoreTask,
+  restoreUser,
   suspendUser,
   updateRunnerIncentiveRule,
   updateReportStatus,
