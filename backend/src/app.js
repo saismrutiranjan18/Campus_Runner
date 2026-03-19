@@ -38,11 +38,27 @@ app.get("/api-docs.json", (_, res) => {
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
-app.get("/api/v1/health", (_, res) => {
-    res.status(200).json({
+app.get("/api/v1/health", (req, res) => {
+    const includeMeta = ["true", "1", "yes"].includes(
+        String(req.query?.includeMeta || "").toLowerCase()
+    );
+
+    const response = {
         success: true,
         message: "Backend is healthy",
-    });
+    };
+
+    if (includeMeta) {
+        response.meta = {
+            service: "campus-runner-backend",
+            environment: process.env.NODE_ENV || "development",
+            timestamp: new Date().toISOString(),
+            uptimeSeconds: Math.floor(process.uptime()),
+            version: process.env.npm_package_version || null,
+        };
+    }
+
+    res.status(200).json(response);
 })
 
 app.use("/api/v1/auth", authRouter)

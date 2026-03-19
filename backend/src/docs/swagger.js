@@ -1058,9 +1058,42 @@ const swaggerDocument = {
       get: {
         tags: ["Health"],
         summary: "Health check",
+        parameters: [
+          {
+            in: "query",
+            name: "includeMeta",
+            schema: { type: "boolean" },
+            required: false,
+            description: "Include runtime metadata like uptime, environment, timestamp, and version.",
+          },
+        ],
         responses: {
           200: {
             description: "Backend is healthy",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Backend is healthy" },
+                    meta: {
+                      type: "object",
+                      nullable: true,
+                      properties: {
+                        service: { type: "string", example: "campus-runner-backend" },
+                        environment: { type: "string", example: "production" },
+                        timestamp: { type: "string", format: "date-time" },
+                        uptimeSeconds: { type: "integer", example: 1250 },
+                        version: {
+                          anyOf: [{ type: "string", example: "1.0.0" }, { type: "null" }],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
