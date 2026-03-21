@@ -193,6 +193,7 @@ const taskSchema = new mongoose.Schema(
     pricingSnapshot: {
       type: pricingSnapshotSchema,
       default: () => ({}),
+    },
     promotionSnapshot: {
       type: promotionSnapshotSchema,
       default: null,
@@ -345,6 +346,7 @@ const taskSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
     attachments: {
       type: [attachmentMetadataSchema],
       default: [],

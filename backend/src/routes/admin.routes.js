@@ -14,7 +14,6 @@ import {
   listRunnerIncentiveRules,
   getRunnerPerformanceById,
   getRunnerPerformanceMetrics,
-  listFraudFlags,
   listReportedIssues,
   listUserCooldowns,
   refundTaskLedger,
@@ -34,6 +33,7 @@ import {
   updateCampusOperationalSettings,
   updateCampusTransportRules,
 } from "../controllers/campusConfig.controller.js";
+import {
   getMaintenanceSettings,
   updateMaintenanceSettings,
 } from "../controllers/maintenance.controller.js";
@@ -71,6 +71,7 @@ router.patch(
   "/users/:userId/cooldowns/:cooldownId/clear",
   createIdempotencyMiddleware(),
   clearUserCooldown,
+);
 router.get("/campuses", listCampusConfigs);
 router.post("/campuses", createIdempotencyMiddleware(), createCampusConfig);
 router.get("/campuses/:campusId", getCampusConfigById);
@@ -111,40 +112,32 @@ router.post(
   evaluateRunnerIncentiveRules,
 );
 router.get("/analytics/dashboard", getAdminAnalyticsDashboard);
-router.patch("/users/:userId/suspend", suspendUser);
-router.patch("/users/:userId/restore", restoreUser);
-router.patch("/tasks/:taskId/archive", archiveTask);
-router.patch("/tasks/:taskId/restore", restoreTask);
-router.get("/exports/:resource", exportAdminResource);
-router.patch("/users/:userId/suspend", suspendUser);
-router.patch("/tasks/:taskId/archive", archiveTask);
 router.patch(
   "/users/:userId/suspend",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
+  createIdempotencyMiddleware(),
   suspendUser,
 );
+router.patch("/users/:userId/restore", restoreUser);
 router.patch(
   "/tasks/:taskId/archive",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
+  createIdempotencyMiddleware(),
   archiveTask,
 );
+router.patch("/tasks/:taskId/restore", restoreTask);
+router.patch("/tasks/:taskId/refund", createIdempotencyMiddleware(), refundTaskLedger);
+router.get("/exports/:resource", exportAdminResource);
 router.get("/fraud-flags", listFraudFlags);
 router.patch(
   "/fraud-flags/:flagId/status",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),
-router.patch("/users/:userId/suspend", createIdempotencyMiddleware(), suspendUser);
-router.patch("/tasks/:taskId/archive", createIdempotencyMiddleware(), archiveTask);
-router.patch("/tasks/:taskId/refund", createIdempotencyMiddleware(), refundTaskLedger);
-router.get("/fraud-flags", listFraudFlags);
-router.patch(
-  "/fraud-flags/:flagId/status",
   createIdempotencyMiddleware(),
   updateFraudFlagStatus,
 );
 router.get("/reports", listReportedIssues);
 router.post("/reports/:reportId/attachments", addReportAttachment);
 router.delete("/reports/:reportId/attachments/:attachmentId", removeReportAttachment);
-router.patch("/reports/:reportId/status", updateReportStatus);
 router.patch(
   "/reports/:reportId/status",
   createRateLimitMiddleware(rateLimitPolicies.adminSensitive),

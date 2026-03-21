@@ -44,10 +44,6 @@ router.post(
   createRateLimitMiddleware(rateLimitPolicies.taskCreate),
   createTask,
 );
-router.patch("/:taskId/accept", authorizeRoles("runner", "admin"), acceptTask);
-  createIdempotencyMiddleware(),
-  createTask,
-);
 router.patch(
   "/:taskId/accept",
   authorizeRoles("runner", "admin"),
@@ -61,11 +57,6 @@ router.patch(
   createIdempotencyMiddleware(),
   markTaskInProgress,
 );
-router.patch("/:taskId/complete", authorizeRoles("runner", "admin"), completeTask);
-router.patch(
-  "/:taskId/cancel",
-  authorizeRoles("requester", "admin"),
-  createRateLimitMiddleware(rateLimitPolicies.taskCancel),
 router.patch(
   "/:taskId/complete",
   authorizeRoles("runner", "admin"),

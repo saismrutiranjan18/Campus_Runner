@@ -23,6 +23,7 @@ import {
   RunnerIncentiveRule,
 } from "../models/runnerIncentiveRule.model.js";
 import { evaluateRunnerIncentives, normalizeCampusZones } from "../services/runnerIncentive.service.js";
+import {
   buildRequesterMetricsMap,
   buildRequesterReputationEntry,
 } from "../services/requesterReputation.service.js";
@@ -467,6 +468,8 @@ const normalizeRunnerIncentiveRulePayload = (payload, { partial = false } = {}) 
   }
 
   return normalizedPayload;
+};
+
 const normalizeRequesterSortValue = (entry, sortBy) => {
   if (sortBy === "fullName") {
     return entry.requester.fullName.toLowerCase();
@@ -628,6 +631,22 @@ const listRunnerIncentiveRules = asyncHandler(async (req, res) => {
     .populate("createdBy", "fullName email phoneNumber role isVerified isActive")
     .populate("updatedBy", "fullName email phoneNumber role isVerified isActive")
     .sort({ isActive: -1, createdAt: -1 });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: rules.map(sanitizeRunnerIncentiveRule),
+        filters: {
+          type: req.query.type || "",
+          active: req.query.active ?? "",
+        },
+      },
+      "Runner incentive rules fetched successfully",
+    ),
+  );
+});
+
 const getRequesterReputationMetrics = asyncHandler(async (req, res) => {
   const {
     search,
@@ -702,16 +721,26 @@ const getRequesterReputationMetrics = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        items: rules.map(sanitizeRunnerIncentiveRule),
+        items: paginatedItems,
+        pagination: {
+          page: resolvedPage,
+          limit: resolvedLimit,
+          total,
+          totalPages: Math.ceil(total / resolvedLimit) || 1,
+        },
         filters: {
-          type: req.query.type || "",
-          active: req.query.active ?? "",
+          search: search || "",
+          active: active ?? "",
+          verified: verified ?? "",
+          campusId: campusId || "",
+          sortBy,
+          order: resolvedOrder,
         },
       },
-      "Runner incentive rules fetched successfully",
+      "Requester reputation metrics fetched successfully",
     ),
   );
-});
+}); 
 
 const createRunnerIncentiveRule = asyncHandler(async (req, res) => {
   const normalizedPayload = normalizeRunnerIncentiveRulePayload(req.body);
@@ -806,24 +835,9 @@ const evaluateRunnerIncentiveRules = asyncHandler(async (req, res) => {
     referenceDate,
     previewOnly: parseRunnerIncentiveBoolean(previewOnly, "previewOnly"),
   });
-        items: paginatedItems,
-        pagination: {
-          page: resolvedPage,
-          limit: resolvedLimit,
-          total,
-          totalPages: Math.ceil(total / resolvedLimit) || 1,
-        },
-        filters: {
-          search: search || "",
-          active: active ?? "",
-          verified: verified ?? "",
-          campusId: campusId || "",
-          sortBy,
-          order: resolvedOrder,
-        },
-      },
-      "Requester reputation metrics fetched successfully",
-    ),
+
+  res.status(200).json(
+    new ApiResponse(200, evaluationResult, "Runner incentive rules evaluated successfully"),
   );
 });
 
@@ -1264,6 +1278,9 @@ const refundTaskLedger = asyncHandler(async (req, res) => {
       },
       "Task refund applied successfully",
     ),
+  );
+});
+
 const restoreTask = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
   const { restoreReason } = req.body;

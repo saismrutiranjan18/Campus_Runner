@@ -8,8 +8,6 @@ const allowedWalletTransactionStatuses = [
   "superseded",
   "voided",
 ];
-const allowedWalletTransactionCategories = ["manual", "withdrawal_request"];
-const allowedWalletTransactionStatuses = ["pending", "completed", "failed"];
 const allowedWalletTransactionCategories = [
   "manual",
   "withdrawal_request",
