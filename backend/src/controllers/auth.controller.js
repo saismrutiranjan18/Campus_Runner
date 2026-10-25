@@ -163,10 +163,6 @@ const registerUser = asyncHandler(async (req, res) => {
     });
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-    user._id,
-  );
-
   const createdUser = await User.findById(user._id);
 
   res

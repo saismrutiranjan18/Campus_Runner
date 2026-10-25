@@ -14,10 +14,10 @@ const sanitizeCampusTargets = (targets = {}) => ({
 const normalizePromotionPayload = (payload = {}, existingPromotion = null) => {
   const normalized = {
     code: normalizePromotionCode(payload.code ?? existingPromotion?.code),
-    title: String(payload.title ?? existingPromotion?.title || "").trim(),
-    description: String(payload.description ?? existingPromotion?.description || "").trim(),
-    kind: String(payload.kind ?? existingPromotion?.kind || "").trim(),
-    discountType: String(payload.discountType ?? existingPromotion?.discountType || "fixed").trim(),
+    title: String((payload.title ?? existingPromotion?.title) || "").trim(),
+    description: String((payload.description ?? existingPromotion?.description) || "").trim(),
+    kind: String((payload.kind ?? existingPromotion?.kind) || "").trim(),
+    discountType: String((payload.discountType ?? existingPromotion?.discountType) || "fixed").trim(),
     discountValue:
       payload.discountValue === undefined ? Number(existingPromotion?.discountValue || 0) : Number(payload.discountValue),
     maxDiscountAmount:

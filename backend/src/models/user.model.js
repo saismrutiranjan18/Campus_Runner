@@ -169,6 +169,7 @@ const userSchema = new mongoose.Schema(
     cooldowns: {
       type: [cooldownSchema],
       default: [],
+    },
     restoredAt: {
       type: Date,
       default: null,
